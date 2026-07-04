@@ -12,6 +12,7 @@ export * from './payment.types';
 // Common types
 export * from './common.types';
 export * from './catalog.types';
+export * from './fund.types';
 
 // ERP Context types
 export interface ERPContextType {
@@ -47,6 +48,11 @@ export interface ERPContextType {
   /** Re-fetch fixed-cost names, product-cost names, and suppliers from the backend. */
   refreshCatalogs: () => Promise<void>;
 
+  /** Internal fund movements (transfers, openings, withdrawals). */
+  fundMovements: import('./fund.types').FundMovement[];
+  /** Re-fetch fund movements from the backend. */
+  refreshFundMovements: () => Promise<void>;
+
   // Catalog lists (server-backed)
   fixedCostItems: CatalogItem[];
   productCostItems: CatalogItem[];
@@ -81,6 +87,7 @@ export interface ERPStats {
   cashBalance: number;
   bankBalance: number;
   bkashBalance: number;
+  reserveBalance: number;
   totalBalance: number;
   cashSales: number;
   bankSales: number;

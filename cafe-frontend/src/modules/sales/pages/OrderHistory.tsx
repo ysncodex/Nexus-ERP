@@ -60,7 +60,7 @@ import {
 } from '@/shared/utils/businessDate';
 import type { Transaction, PaymentMethod, SalesChannel, ReceiptStatus } from '@/core/types';
 import { printOrderAsync } from '../utils/posPrintService';
-import { transactionToOrder, transactionToSaleUpdate } from '../utils/orderUtils';
+import { transactionToOrder, transactionToSaleUpdate, resolveOrderTimestamp } from '../utils/orderUtils';
 import { PaymentPanel } from '../components/PaymentPanel';
 import type { NewOrderData } from '../types/menuItem.types';
 
@@ -142,6 +142,11 @@ function itemCount(t: Transaction): number {
   return t.quantity ?? 1;
 }
 
+/** Best-effort instant for sorting — prefers order date, falls back to row insert time. */
+function orderInstant(t: Transaction): number {
+  return new Date(resolveOrderTimestamp(t)).getTime();
+}
+
 /** Highest-value completed order in the current filtered set (for row highlight). */
 function findTopOrderId(rows: Transaction[]): string | null {
   const completed = rows.filter((t) => statusOf(t) === 'completed');
@@ -154,7 +159,7 @@ function findTopOrderId(rows: Transaction[]): string | null {
       (t.amount === top.amount && itemCount(t) > itemCount(top)) ||
       (t.amount === top.amount &&
         itemCount(t) === itemCount(top) &&
-        new Date(t.date).getTime() > new Date(top.date).getTime())
+        orderInstant(t) > orderInstant(top))
     ) {
       top = t;
     }
@@ -208,14 +213,21 @@ function KpiCard({
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}>
-        <Icon size={19} className="text-white" />
+    <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3">
+      <div
+        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${color}`}
+      >
+        <Icon size={16} className="text-white sm:hidden" />
+        <Icon size={19} className="text-white hidden sm:block" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-        <p className="text-xl font-black text-slate-800 leading-tight truncate">{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+        <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide truncate">
+          {label}
+        </p>
+        <p className="text-base sm:text-xl font-black text-slate-800 leading-tight truncate">
+          {value}
+        </p>
+        {sub && <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -234,21 +246,24 @@ function RevenueKpiCard({
   return (
     <div
       className={`bg-white rounded-2xl border transition-all duration-200 ${
-        expanded ? 'border-emerald-300 shadow-md ring-2 ring-emerald-100' : 'border-slate-200'
+        expanded
+          ? 'col-span-2 sm:col-span-1 border-emerald-300 shadow-md ring-2 ring-emerald-100'
+          : 'border-slate-200'
       }`}
     >
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full p-4 flex items-start gap-3 text-left group"
+        className="w-full p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3 text-left group"
         aria-expanded={expanded}
       >
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500">
-          <TrendingUp size={19} className="text-white" />
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-emerald-500">
+          <TrendingUp size={16} className="text-white sm:hidden" />
+          <TrendingUp size={19} className="text-white hidden sm:block" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide truncate">
               Total Revenue
             </p>
             <ChevronDownIcon
@@ -258,19 +273,17 @@ function RevenueKpiCard({
               }`}
             />
           </div>
-          <p className="text-xl font-black text-slate-800 leading-tight truncate">
+          <p className="text-base sm:text-xl font-black text-slate-800 leading-tight truncate">
             {formatCurrency(revenue)}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {expanded
-              ? 'Tap to hide payment breakdown'
-              : 'Completed orders · tap for Cash, bKash & Card'}
+          <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">
+            {expanded ? 'Tap to hide payment breakdown' : 'Completed orders · tap for breakdown'}
           </p>
         </div>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-slate-100">
+        <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 space-y-3 border-t border-slate-100">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-3">
             By Payment Method
           </p>
@@ -332,8 +345,8 @@ function PendingPaymentModal({
   ) => void;
 }) {
   const baseOrder = useMemo(() => transactionToOrder(tx), [tx]);
-  const [customerPaidStr, setCustomerPaidStr] = useState(
-    () => String(tx.customerPaid ?? tx.amount),
+  const [customerPaidStr, setCustomerPaidStr] = useState(() =>
+    String(tx.customerPaid ?? tx.amount)
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(tx.method ?? 'cash');
   const [printing, setPrinting] = useState(false);
@@ -566,8 +579,8 @@ function DetailDrawer({
             </h3>
             <div className="bg-slate-50 rounded-xl divide-y divide-slate-100">
               {[
-                { label: 'Date', value: formatDate(tx.date) },
-                { label: 'Time', value: formatTime(tx.date) },
+                { label: 'Date', value: formatDate(resolveOrderTimestamp(tx)) },
+                { label: 'Time', value: formatTime(resolveOrderTimestamp(tx)) },
                 ...(tx.customerName ? [{ label: 'Customer', value: tx.customerName }] : []),
                 ...(tx.cashier ? [{ label: 'Cashier', value: tx.cashier }] : []),
               ].map(({ label, value }) => (
@@ -912,15 +925,14 @@ export default function OrderHistory() {
 
     const fromKey = dateFrom || todayBusinessKey();
     const toKey = dateTo || todayBusinessKey();
-    rows = rows.filter((t) =>
-      isBusinessDayKeyInRange(businessDateKey(t.date), fromKey, toKey),
-    );
+    rows = rows.filter((t) => isBusinessDayKeyInRange(businessDateKey(t.date), fromKey, toKey));
 
     return [...rows].sort((a, b) => {
       let cmp = 0;
-      if (sortField === 'date') cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (sortField === 'date') cmp = orderInstant(a) - orderInstant(b);
       if (sortField === 'amount') cmp = a.amount - b.amount;
       if (sortField === 'items') cmp = itemCount(a) - itemCount(b);
+      if (cmp === 0) cmp = b.id.localeCompare(a.id);
       return sortDir === 'asc' ? cmp : -cmp;
     });
   }, [
@@ -1111,29 +1123,29 @@ export default function OrderHistory() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3 sm:space-y-5">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Order History</h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Order History</h1>
+          <p className="text-[11px] sm:text-sm text-slate-500 mt-0.5 truncate">
             {loading
               ? 'Loading orders from server…'
               : `${filtered.length} orders in range · ${filtered.filter((t) => statusOf(t) === 'completed').length} completed${kpis.pendingCount > 0 ? ` · ${kpis.pendingCount} pending` : ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {activeFilters > 0 && (
             <button
               onClick={clearFilters}
-              className="text-xs text-red-500 hover:text-red-600 font-semibold flex items-center gap-1 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
+              className="text-[11px] sm:text-xs text-red-500 hover:text-red-600 font-semibold flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 transition-colors whitespace-nowrap"
             >
-              <X size={12} /> Clear filters ({activeFilters})
+              <X size={12} /> Clear ({activeFilters})
             </button>
           )}
           <button
             onClick={() => setShowFilters((v) => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
               showFilters || activeFilters > 0
                 ? 'border-amber-400 bg-amber-50 text-amber-700'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
@@ -1151,7 +1163,7 @@ export default function OrderHistory() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
         <KpiCard
           label="Total Orders"
           value={String(kpis.total)}
@@ -1197,7 +1209,7 @@ export default function OrderHistory() {
 
       {/* ── Advanced Filters ── */}
       {showFilters && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
           {/* Status */}
           <div>
             <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
@@ -1293,7 +1305,7 @@ export default function OrderHistory() {
         </span>
         <div className="flex items-center gap-3">
           {topOrderId && (
-            <span className="inline-flex items-center gap-1 text-violet-600 font-semibold">
+            <span className="hidden sm:inline-flex items-center gap-1 text-violet-600 font-semibold">
               <Trophy size={12} className="text-violet-500" />
               Top order = highest completed bill in results
             </span>
@@ -1414,11 +1426,11 @@ export default function OrderHistory() {
 
                     <DataTableCell align="left">
                       <p className="text-xs font-semibold text-slate-700 tabular-nums">
-                        {formatDate(tx.date)}
+                        {formatDate(resolveOrderTimestamp(tx))}
                       </p>
                       <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5 tabular-nums">
                         <Clock size={10} className="shrink-0" />
-                        {formatTime(tx.date)}
+                        {formatTime(resolveOrderTimestamp(tx))}
                       </p>
                     </DataTableCell>
 

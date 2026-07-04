@@ -85,7 +85,7 @@ const RAW: Omit<SeedMenuItem, 'id'>[] = [
   { name: 'Spicy Peri Peri Pasta', category: 'Pasta', price: 350, available: true },
   { name: 'Peri Peri Potato Wedges', category: 'Sides', price: 120, available: true },
   { name: 'Spicy Street Fries', category: 'Sides', price: 110, available: true },
-  { name: 'Extra Baba', category: 'Add On', price: 90, available: true },
+  { name: 'Extra Boba', category: 'Add On', price: 90, available: true },
   { name: 'Extra Nutella', category: 'Add On', price: 55, available: true },
   { name: 'Extra Nuts', category: 'Add On', price: 35, available: true },
   { name: 'Ice Cream', category: 'Add On', price: 60, available: true },

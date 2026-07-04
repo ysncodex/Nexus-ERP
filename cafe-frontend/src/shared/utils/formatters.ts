@@ -3,6 +3,8 @@
  * Format dates, currency, and other display values
  */
 
+import { BUSINESS_TIMEZONE } from '@/shared/utils/businessDate';
+
 /**
  * Format currency (Bangladeshi Taka)
  */
@@ -11,27 +13,35 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
- * Format date to local string
+ * Format date in the business timezone (Asia/Dhaka).
  */
 export function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString();
+  return d.toLocaleDateString(undefined, { timeZone: BUSINESS_TIMEZONE });
 }
 
 /**
- * Format datetime
+ * Format datetime in the business timezone.
  */
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  return `${d.toLocaleDateString(undefined, { timeZone: BUSINESS_TIMEZONE })} ${d.toLocaleTimeString([], {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`;
 }
 
 /**
- * Format time only
+ * Format time only in the business timezone.
  */
 export function formatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString([], {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /**

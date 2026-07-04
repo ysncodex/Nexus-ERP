@@ -4,15 +4,29 @@
 import type { Transaction } from '@/core/types';
 import type { SaleCreateData, SaleUpdateData } from '@/core/api/services/sales.service';
 import type { ExpenseCreateData } from '@/core/api/services/expenses.service';
-import { parseBusinessDate } from '@/shared/utils/businessDate';
+import { parseBusinessDate, resolveTransactionDate } from '@/shared/utils/businessDate';
 
 function toIsoDate(date: Date | string | undefined): string {
-  if (!date) return parseBusinessDate(new Date()).toISOString();
-  return parseBusinessDate(date).toISOString();
+  if (!date) return resolveTransactionDate(new Date()).toISOString();
+  return resolveTransactionDate(date).toISOString();
 }
 
-export function parseApiTransaction(t: Transaction & { date: string | Date }): Transaction {
-  return { ...t, date: t.date instanceof Date ? t.date : parseBusinessDate(t.date) };
+export function parseApiTransaction(t: Transaction & { date: string | Date; createdAt?: string | Date }): Transaction {
+  const date =
+    t.date instanceof Date
+      ? t.date
+      : /^\d{4}-\d{2}-\d{2}$/.test(String(t.date).trim())
+        ? parseBusinessDate(t.date)
+        : new Date(t.date);
+
+  const createdAt =
+    t.createdAt === undefined
+      ? undefined
+      : t.createdAt instanceof Date
+        ? t.createdAt
+        : new Date(t.createdAt);
+
+  return { ...t, date, createdAt };
 }
 
 export function isSaleType(type: string): boolean {

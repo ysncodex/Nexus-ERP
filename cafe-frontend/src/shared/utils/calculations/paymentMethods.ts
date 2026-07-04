@@ -1,10 +1,17 @@
 import { isPaidSale, type Transaction } from '@/core/types/transaction.types';
 import { businessDateKey, todayBusinessKey } from '@/shared/utils/businessDate';
+import type { FundAccountType } from '@/core/types/fund.types';
 
 /**
  * Payment Method Balance Tracking
  * Comprehensive tracking for Cash, Bank, and Bkash balances
  */
+
+export interface FundMovementBalanceInput {
+  fromAccount?: string;
+  toAccount?: string;
+  amount: number;
+}
 
 export interface MethodBreakdown {
   balance: number;
@@ -27,12 +34,34 @@ function emptyBreakdown(): MethodBreakdown {
   return { balance: 0, sales: 0, expenses: 0 };
 }
 
+/** Net fund-movement delta per internal account (all-time). */
+export function computeFundNetFlows(fundMovements: FundMovementBalanceInput[]) {
+  const flows: Record<FundAccountType, number> = {
+    cash: 0,
+    bank: 0,
+    bkash: 0,
+    reserve: 0,
+  };
+
+  fundMovements.forEach((movement) => {
+    const amount = Number(movement.amount);
+    const from = movement.fromAccount;
+    const to = movement.toAccount;
+
+    if (from && from in flows) flows[from as FundAccountType] -= amount;
+    if (to && to in flows) flows[to as FundAccountType] += amount;
+  });
+
+  return flows;
+}
+
 /**
  * Calculate comprehensive balances for all payment methods
  */
 export function calculatePaymentMethodBalances(
   allTransactions: Transaction[],
-  filteredTransactions?: Transaction[]
+  filteredTransactions?: Transaction[],
+  fundMovements?: FundMovementBalanceInput[],
 ): PaymentMethodBalances {
   const filtered = filteredTransactions || allTransactions;
 
@@ -73,6 +102,13 @@ export function calculatePaymentMethodBalances(
       else if (t.type === 'expense_product' || t.type === 'expense_fixed') bkash.expenses += val;
     }
   });
+
+  if (fundMovements?.length) {
+    const fundFlows = computeFundNetFlows(fundMovements);
+    cash.balance += fundFlows.cash;
+    bank.balance += fundFlows.bank;
+    bkash.balance += fundFlows.bkash;
+  }
 
   return {
     cash,

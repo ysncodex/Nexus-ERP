@@ -25,6 +25,7 @@ export function serializeTransaction(t: Transaction) {
     unitPrice: toNum(t.unitPrice),
     supplier: t.supplier ?? undefined,
     date: t.date.toISOString(),
+    createdAt: t.createdAt.toISOString(),
     cashier: t.cashier ?? undefined,
     customerName: t.customerName ?? undefined,
     loyaltyMemberId: t.loyaltyMemberId ?? undefined,

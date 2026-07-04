@@ -3,15 +3,22 @@
  */
 
 import { generateId } from '@/shared/utils';
-import {
-  parseBusinessDate,
-  todayBusinessKey,
-  todayBusinessParts,
-} from '@/shared/utils/businessDate';
+import { todayBusinessParts } from '@/shared/utils/businessDate';
 import type { ReceiptStatus, Transaction } from '@/core/types';
 import type { DiscountType, NewOrderData, OrderItem } from '../types/menuItem.types';
 
 export const NO_TABLE = '— None —';
+
+/** Best instant for receipts/sorting — real order time, with legacy UTC-noon fallback to createdAt. */
+export function resolveOrderTimestamp(tx: Pick<Transaction, 'date' | 'createdAt'>): string {
+  const dateMs = new Date(tx.date).getTime();
+  if (!tx.createdAt) return new Date(dateMs).toISOString();
+
+  const d = new Date(tx.date);
+  const isLegacyNoon = d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+  if (isLegacyNoon) return new Date(tx.createdAt).toISOString();
+  return new Date(dateMs).toISOString();
+}
 
 export function lineUnitPrice(item: OrderItem): number {
   return item.isGift ? 0 : item.menuItem.price;
@@ -36,7 +43,7 @@ export function computeGiftStats(items: OrderItem[]) {
 export function computeOrderTotals(
   items: OrderItem[],
   discountType: DiscountType,
-  discountValue: number,
+  discountValue: number
 ) {
   const subtotal = items.reduce((s, oi) => s + lineTotal(oi), 0);
   let discount = 0;
@@ -73,10 +80,10 @@ export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
   const { subtotal, discount, total, giftItemCount, giftTotalValue } = computeOrderTotals(
     params.items,
     params.discountType,
-    params.discountValue,
+    params.discountValue
   );
   const isDineIn = params.channel === 'in_store';
-  const now = parseBusinessDate(todayBusinessKey()).toISOString();
+  const now = new Date().toISOString();
 
   return {
     id: generateId(),
@@ -108,7 +115,7 @@ function mapPosChannelToErp(channel: NewOrderData['channel']) {
 
 export function orderToTransaction(
   order: NewOrderData,
-  status: ReceiptStatus,
+  status: ReceiptStatus
 ): Omit<Transaction, 'id' | 'date'> {
   const totalItems = order.items.reduce((s, oi) => s + oi.quantity, 0);
   const { giftItemCount, giftTotalValue } = computeGiftStats(order.items);
@@ -147,7 +154,7 @@ export function orderToTransaction(
 /** Map a POS order to the backend `/sales` create payload. */
 export function orderToSalePayload(
   order: NewOrderData,
-  status: ReceiptStatus,
+  status: ReceiptStatus
 ): import('@/core/api/services').SaleCreateData {
   const tx = orderToTransaction(order, status);
   const isPending = status === 'pending';
@@ -191,14 +198,14 @@ export function orderToSalePayload(
 /** Map a Transaction back to a partial sale update payload. */
 export function transactionToSaleUpdate(
   tx: Transaction,
-  payment?: { customerPaid?: number; changeAmount?: number },
+  payment?: { customerPaid?: number; changeAmount?: number }
 ): import('@/core/api/services').SaleUpdateData {
   return {
     channel: tx.channel,
     ...(tx.method ? { paymentMethod: tx.method } : {}),
     amount: tx.amount,
     description: tx.description,
-    date: parseBusinessDate(tx.date).toISOString(),
+    date: new Date(tx.date).toISOString(),
     orderNumber: tx.orderNumber,
     receiptStatus: tx.receiptStatus,
     posChannel: tx.posChannel,
@@ -241,7 +248,9 @@ export function transactionToOrder(tx: Transaction): NewOrderData | null {
     tableNumber: tx.tableNumber ?? NO_TABLE,
     paymentMethod: tx.method ?? 'cash',
     channel: tx.posChannel ?? 'in_store',
-    subtotal: tx.subtotal ?? tx.receiptLines.reduce((s, l) => s + l.qty * l.unitPrice, 0) + (tx.discountAmount ?? 0),
+    subtotal:
+      tx.subtotal ??
+      tx.receiptLines.reduce((s, l) => s + l.qty * l.unitPrice, 0) + (tx.discountAmount ?? 0),
     discount: tx.discountAmount ?? 0,
     discountType: tx.discountType,
     discountValue: tx.discountValue,
@@ -249,7 +258,7 @@ export function transactionToOrder(tx: Transaction): NewOrderData | null {
     total: tx.amount,
     customerPaid: tx.customerPaid ?? (tx.receiptStatus === 'pending' ? 0 : tx.amount),
     changeAmount: tx.changeAmount ?? 0,
-    createdAt: new Date(tx.date).toISOString(),
+    createdAt: resolveOrderTimestamp(tx),
     cashierName: tx.cashier ?? '',
     giftItemCount: tx.giftItemCount,
     giftTotalValue: tx.giftTotalValue,

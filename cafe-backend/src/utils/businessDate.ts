@@ -40,6 +40,22 @@ export function parseBusinessDate(input: string | Date): Date {
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
 }
 
+/**
+ * Resolve a value for ledger / POS storage.
+ * Date-picker keys (YYYY-MM-DD) → UTC noon of that business day.
+ * Full ISO datetimes → preserve the exact instant (order creation time).
+ */
+export function resolveTransactionDate(input: string | Date): Date {
+  if (input instanceof Date) return input;
+
+  const trimmed = input.trim();
+  if (DATE_ONLY_RE.test(trimmed)) return parseBusinessDate(trimmed);
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid date: ${input}`);
+  return parsed;
+}
+
 /** Today's business-day key (YYYY-MM-DD) in the business timezone. */
 export function todayBusinessKey(): string {
   return instantToBusinessKey(new Date());
