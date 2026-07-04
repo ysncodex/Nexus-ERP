@@ -376,7 +376,7 @@ function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorPr
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { transactions } = useERP();
+  const { transactions, fundMovements } = useERP();
   const now = new Date();
 
   const [comparisonPeriod, setComparisonPeriod] = useState<ComparisonPeriod>('none');
@@ -426,8 +426,8 @@ export default function Reports() {
   );
 
   const stats = useMemo(
-    () => computeStats(transactions, monthTransactions),
-    [transactions, monthTransactions]
+    () => computeStats(transactions, monthTransactions, fundMovements),
+    [transactions, monthTransactions, fundMovements]
   );
 
   const goToPrevMonth = () =>

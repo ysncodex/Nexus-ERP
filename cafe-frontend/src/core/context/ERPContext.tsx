@@ -8,6 +8,7 @@ import type {
   ERPContextType,
   CatalogItem,
   Supplier,
+  FundMovement,
 } from '@/core/types';
 import { generateId, STORAGE_KEYS, blockReadOnlyMutation, isAuthenticated } from '@/shared/utils';
 import { businessTodayDateRange, todayBusinessKey } from '@/shared/utils/businessDate';
@@ -23,7 +24,7 @@ import {
   fetchAllTransactions,
   updateTransactionOnServer,
 } from './erp/apiRepository';
-import { catalogService, suppliersService } from '@/core/api/services';
+import { catalogService, suppliersService, fundsService } from '@/core/api/services';
 
 import { ERPContext } from './ERPContextDef';
 
@@ -48,6 +49,7 @@ function loadSavedDateRange(): DateRangeFilter {
 /** Legacy localStorage bootstrap — catalogs now load from the API. */
 export function ERPProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [fundMovements, setFundMovements] = useState<FundMovement[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('today');
   const [customStart, setCustomStart] = useState('');
@@ -84,6 +86,21 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshFundMovements = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setFundMovements([]);
+      return;
+    }
+
+    try {
+      const rows = await fundsService.getAll();
+      setFundMovements(rows);
+    } catch {
+      toast.error('Could not load fund movements from server');
+      setFundMovements([]);
+    }
+  }, []);
+
   const refreshTransactions = useCallback(async () => {
     if (!isAuthenticated()) {
       setTransactions([]);
@@ -116,7 +133,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshTransactions();
     void refreshCatalogs();
-  }, [refreshTransactions, refreshCatalogs]);
+    void refreshFundMovements();
+  }, [refreshTransactions, refreshCatalogs, refreshFundMovements]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const filteredTransactions = useMemo(
@@ -125,8 +143,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
   );
 
   const stats = useMemo(
-    () => computeStats(transactions, filteredTransactions),
-    [transactions, filteredTransactions]
+    () => computeStats(transactions, filteredTransactions, fundMovements),
+    [transactions, filteredTransactions, fundMovements]
   );
 
   const dailyRecords = useMemo(
@@ -377,6 +395,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     isLoadingTransactions,
     refreshTransactions,
     refreshCatalogs,
+    fundMovements,
+    refreshFundMovements,
     fixedCostItems,
     productCostItems,
     suppliers,

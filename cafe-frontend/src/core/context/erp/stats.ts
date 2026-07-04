@@ -1,8 +1,17 @@
 import type { ERPStats, Transaction } from '@/core/types';
+import type { FundMovement } from '@/core/types/fund.types';
 import { isPaidSale } from '@/core/types/transaction.types';
-import { calculateDailyAvailableCash, calculatePaymentMethodBalances } from '@/shared/utils/calculations';
+import {
+  calculateDailyAvailableCash,
+  calculatePaymentMethodBalances,
+  computeFundNetFlows,
+} from '@/shared/utils/calculations';
 
-export function computeStats(transactions: Transaction[], filteredTransactions: Transaction[]): ERPStats {
+export function computeStats(
+  transactions: Transaction[],
+  filteredTransactions: Transaction[],
+  fundMovements: FundMovement[] = [],
+): ERPStats {
   let totalSales = 0;
   let foodpandaSales = 0;
   let foodiSales = 0;
@@ -15,7 +24,12 @@ export function computeStats(transactions: Transaction[], filteredTransactions: 
   const productUsage: Record<string, { qty: number; unit: string; cost: number; count: number }> = {};
   const fixedCostAgg: Record<string, number> = {};
 
-  const paymentMethods = calculatePaymentMethodBalances(transactions, filteredTransactions);
+  const paymentMethods = calculatePaymentMethodBalances(
+    transactions,
+    filteredTransactions,
+    fundMovements,
+  );
+  const fundFlows = computeFundNetFlows(fundMovements);
   const dailyAvailableCash = calculateDailyAvailableCash(transactions);
 
   let netCashInRange = 0;
@@ -94,6 +108,7 @@ export function computeStats(transactions: Transaction[], filteredTransactions: 
     cashBalance: paymentMethods.cash.balance,
     bankBalance: paymentMethods.bank.balance,
     bkashBalance: paymentMethods.bkash.balance,
+    reserveBalance: fundFlows.reserve,
     totalBalance: paymentMethods.total.balance,
     cashSales: paymentMethods.cash.sales,
     bankSales: paymentMethods.bank.sales,

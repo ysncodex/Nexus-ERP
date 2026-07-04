@@ -10,6 +10,7 @@ import expensesRoutes from './modules/expenses/expenses.routes.js';
 import reportsRoutes from './modules/reports/reports.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import suppliersRoutes from './modules/suppliers/suppliers.routes.js';
+import fundsRoutes from './modules/funds/funds.routes.js';
 
 export function createApp() {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp() {
   app.use('/api/reports', reportsRoutes);
   app.use('/api/menu', menuRoutes);
   app.use('/api/suppliers', suppliersRoutes);
+  app.use('/api/funds', fundsRoutes);
 
   // ── Fallbacks ──────────────────────────────────────────────────────────────
   app.use(notFound);

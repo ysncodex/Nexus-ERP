@@ -66,24 +66,36 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    onSave({ name: name.trim(), category, price: parseFloat(price), available, description: description.trim() || undefined });
+    onSave({
+      name: name.trim(),
+      category,
+      price: parseFloat(price),
+      available,
+      description: description.trim() || undefined,
+    });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="text-lg font-bold text-slate-800">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 shrink-0">
+          <h2 className="text-base sm:text-lg font-bold text-slate-800">
             {item ? 'Edit Item' : 'Add New Item'}
           </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+          >
             <X size={18} className="text-slate-500" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4"
+        >
           {/* Name */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Item Name</label>
@@ -92,7 +104,9 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Hazelnut Latte"
               className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                errors.name ? 'border-red-400 focus:ring-2 focus:ring-red-200' : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
+                errors.name
+                  ? 'border-red-400 focus:ring-2 focus:ring-red-200'
+                  : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
               }`}
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
@@ -107,7 +121,9 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all bg-white"
             >
               {ALL_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </div>
@@ -122,7 +138,9 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               placeholder="0"
               min="0"
               className={`w-full px-3.5 py-2.5 rounded-xl border text-sm outline-none transition-all ${
-                errors.price ? 'border-red-400 focus:ring-2 focus:ring-red-200' : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
+                errors.price
+                  ? 'border-red-400 focus:ring-2 focus:ring-red-200'
+                  : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
               }`}
             />
             {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
@@ -130,7 +148,9 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description <span className="font-normal text-slate-400">(optional)</span></label>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Description <span className="font-normal text-slate-400">(optional)</span>
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -148,16 +168,20 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               onClick={() => setAvailable(!available)}
               className="flex items-center gap-2 transition-colors"
             >
-              {available
-                ? <ToggleRight size={28} className="text-emerald-500" />
-                : <ToggleLeft size={28} className="text-slate-400" />}
-              <span className={`text-sm font-medium ${available ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {available ? (
+                <ToggleRight size={28} className="text-emerald-500" />
+              ) : (
+                <ToggleLeft size={28} className="text-slate-400" />
+              )}
+              <span
+                className={`text-sm font-medium ${available ? 'text-emerald-600' : 'text-slate-400'}`}
+              >
                 {available ? 'Yes' : 'No'}
               </span>
             </button>
           </div>
 
-          {/* Actions */}
+          {/* Actions — kept inside the form so Enter-to-submit still works */}
           <div className="flex gap-3 pt-1">
             <button
               type="button"
@@ -194,7 +218,9 @@ function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: Pro
   return (
     <div
       className={`bg-white rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
-        item.available ? 'border-slate-200 hover:border-slate-300 hover:shadow-md' : 'border-slate-100 opacity-60'
+        item.available
+          ? 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+          : 'border-slate-100 opacity-60'
       }`}
     >
       {!item.available && (
@@ -205,56 +231,51 @@ function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: Pro
         </div>
       )}
 
-      <div className="p-3.5">
+      <div className="p-3 sm:p-3.5">
         {/* Category */}
         <div className="mb-2">
           <CategoryDot category={item.category} />
         </div>
 
         {/* Name */}
-        <h3 className="text-sm font-bold text-slate-800 leading-snug mb-3 min-h-[2.5rem]">
+        <h3 className="text-[13px] sm:text-sm font-bold text-slate-800 leading-snug mb-2.5 sm:mb-3 min-h-[2.25rem] sm:min-h-[2.5rem]">
           {item.name}
         </h3>
 
-        {/* Price + Actions */}
-        <div className="flex items-center justify-between">
-          <span className="text-base font-bold text-slate-800">৳{item.price}</span>
+        {/* Price + Actions — always visible on touch, hover-reveal on desktop for a cleaner look */}
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-sm sm:text-base font-bold text-slate-800 shrink-0">
+            ৳{item.price}
+          </span>
 
           {!readOnly && (
-            <>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => onToggle(item)}
-                  title={item.available ? 'Mark unavailable' : 'Mark available'}
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    item.available
-                      ? 'hover:bg-amber-50 text-amber-500 hover:text-amber-600'
-                      : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'
-                  }`}
-                >
-                  {item.available ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                </button>
-                <button
-                  onClick={() => onEdit(item)}
-                  className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => onDelete(item)}
-                  className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-
+            <div className="flex items-center gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
+              <button
+                onClick={() => onToggle(item)}
+                title={item.available ? 'Mark unavailable' : 'Mark available'}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  item.available
+                    ? 'hover:bg-amber-50 text-amber-500 hover:text-amber-600'
+                    : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'
+                }`}
+              >
+                {item.available ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+              </button>
               <button
                 onClick={() => onEdit(item)}
-                className="p-1 rounded-full border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition-all group-hover:opacity-0 absolute right-3.5 bottom-3.5"
+                title="Edit item"
+                className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
               >
-                <Plus size={16} className="text-slate-400 hover:text-amber-500" />
+                <Pencil size={13} />
               </button>
-            </>
+              <button
+                onClick={() => onDelete(item)}
+                title="Delete item"
+                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -264,10 +285,18 @@ function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: Pro
 
 // ─── Delete Confirm Modal ────────────────────────────────────────────────────
 
-function DeleteConfirmModal({ item, onConfirm, onCancel }: { item: MenuItem; onConfirm: () => void; onCancel: () => void }) {
+function DeleteConfirmModal({
+  item,
+  onConfirm,
+  onCancel,
+}: {
+  item: MenuItem;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Trash2 size={22} className="text-red-500" />
         </div>
@@ -333,7 +362,7 @@ export default function ItemList() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       items = items.filter(
-        (i) => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q),
+        (i) => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q)
       );
     }
     return items;
@@ -357,28 +386,34 @@ export default function ItemList() {
   const totalCategories = new Set(catalog.map((i) => i.category)).size;
 
   // ── Handlers ──
-  const handleAdd = useCallback(async (data: Omit<MenuItem, 'id'>) => {
-    try {
-      const newItem = await menuService.create(data);
-      await refreshCatalog();
-      setShowAddModal(false);
-      toast.success(`"${newItem.name}" added to menu`);
-    } catch {
-      toast.error('Failed to add item');
-    }
-  }, [refreshCatalog]);
+  const handleAdd = useCallback(
+    async (data: Omit<MenuItem, 'id'>) => {
+      try {
+        const newItem = await menuService.create(data);
+        await refreshCatalog();
+        setShowAddModal(false);
+        toast.success(`"${newItem.name}" added to menu`);
+      } catch {
+        toast.error('Failed to add item');
+      }
+    },
+    [refreshCatalog]
+  );
 
-  const handleEdit = useCallback(async (data: Omit<MenuItem, 'id'>) => {
-    if (!editingItem) return;
-    try {
-      await menuService.update(editingItem.id, data);
-      await refreshCatalog();
-      setEditingItem(null);
-      toast.success('Item updated');
-    } catch {
-      toast.error('Failed to update item');
-    }
-  }, [editingItem, refreshCatalog]);
+  const handleEdit = useCallback(
+    async (data: Omit<MenuItem, 'id'>) => {
+      if (!editingItem) return;
+      try {
+        await menuService.update(editingItem.id, data);
+        await refreshCatalog();
+        setEditingItem(null);
+        toast.success('Item updated');
+      } catch {
+        toast.error('Failed to update item');
+      }
+    },
+    [editingItem, refreshCatalog]
+  );
 
   const handleDelete = useCallback(async () => {
     if (!deletingItem) return;
@@ -392,30 +427,39 @@ export default function ItemList() {
     }
   }, [deletingItem, refreshCatalog]);
 
-  const handleToggle = useCallback(async (item: MenuItem) => {
-    try {
-      await menuService.toggleAvailability(item.id);
-      await refreshCatalog();
-      toast.success(`"${item.name}" marked as ${item.available ? 'unavailable' : 'available'}`);
-    } catch {
-      toast.error('Failed to update availability');
-    }
-  }, [refreshCatalog]);
+  const handleToggle = useCallback(
+    async (item: MenuItem) => {
+      try {
+        await menuService.toggleAvailability(item.id);
+        await refreshCatalog();
+        toast.success(`"${item.name}" marked as ${item.available ? 'unavailable' : 'available'}`);
+      } catch {
+        toast.error('Failed to update availability');
+      }
+    },
+    [refreshCatalog]
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Products List</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {loading ? 'Loading menu from server…' : (
+      <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Products List</h1>
+          <p className="text-[11px] sm:text-sm text-slate-500 mt-0.5">
+            {loading ? (
+              'Loading menu from server…'
+            ) : (
               <>
-                Manage your menu catalog · {catalog.length} items · {availableCount} available
+                {catalog.length} items · {availableCount} available
                 {unavailableCount > 0 && (
-                  <span className="text-red-600 font-medium"> · {unavailableCount} unavailable</span>
+                  <span className="text-red-600 font-medium">
+                    {' '}
+                    · {unavailableCount} unavailable
+                  </span>
                 )}
-                {' · '}{totalCategories} categories
+                {' · '}
+                {totalCategories} categories
               </>
             )}
           </p>
@@ -423,7 +467,7 @@ export default function ItemList() {
         {canMutate && (
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm shadow-amber-200"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold text-xs sm:text-sm transition-colors shadow-sm shadow-amber-200 shrink-0"
           >
             <Plus size={16} />
             Add New Item
@@ -450,12 +494,15 @@ export default function ItemList() {
         )}
       </div>
 
-      {/* ── Category Filter Pills ── */}
-      <div className="flex flex-wrap gap-2">
+      {/* ── Category Filter Pills — horizontal scroll on mobile, wraps on larger screens ── */}
+      <div
+        className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none' }}
+      >
         {/* All pill */}
         <button
           onClick={() => setSelectedCategory('All')}
-          className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+          className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
             selectedCategory === 'All'
               ? 'bg-amber-400 text-white shadow-sm'
               : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
@@ -472,7 +519,7 @@ export default function ItemList() {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+              className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
                 isActive
                   ? `${style.badge} border border-current/20 shadow-sm`
                   : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
@@ -489,7 +536,7 @@ export default function ItemList() {
         {/* Unavailable — virtual filter (red) */}
         <button
           onClick={() => setSelectedCategory('Unavailable')}
-          className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+          className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
             selectedCategory === 'Unavailable'
               ? `${UNAVAILABLE_FILTER_STYLE.badge} shadow-sm`
               : 'bg-white border border-slate-200 text-slate-600 hover:border-red-200 hover:text-red-600'
@@ -504,28 +551,29 @@ export default function ItemList() {
 
       {/* ── Results count ── */}
       {(searchQuery || selectedCategory !== 'All') && (
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <ListFilter size={14} />
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 flex-wrap">
+          <ListFilter size={14} className="shrink-0" />
           <span>
             Showing {filtered.length} item{filtered.length !== 1 ? 's' : ''}
             {selectedCategory === 'Unavailable' && (
               <span className="text-red-600 font-medium"> (unavailable only)</span>
             )}
           </span>
-          {(searchQuery || selectedCategory !== 'All') && (
-            <button
-              onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
-              className="ml-1 text-amber-600 hover:text-amber-700 font-medium"
-            >
-              Clear filters
-            </button>
-          )}
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedCategory('All');
+            }}
+            className="ml-1 text-amber-600 hover:text-amber-700 font-medium"
+          >
+            Clear filters
+          </button>
         </div>
       )}
 
       {/* ── Product Grid ── */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
           {filtered.map((item) => (
             <ProductCard
               key={item.id}
@@ -538,9 +586,9 @@ export default function ItemList() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <Package size={48} className="text-slate-300 mb-4" />
-          <p className="text-lg font-semibold text-slate-500">No items found</p>
+        <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4">
+          <Package size={44} className="text-slate-300 mb-4" />
+          <p className="text-base sm:text-lg font-semibold text-slate-500">No items found</p>
           <p className="text-sm text-slate-400 mt-1">
             {searchQuery
               ? `No results for "${searchQuery}"`
@@ -550,7 +598,11 @@ export default function ItemList() {
           </p>
           {canMutate && (
             <button
-              onClick={() => { setShowAddModal(true); setSearchQuery(''); setSelectedCategory('All'); }}
+              onClick={() => {
+                setShowAddModal(true);
+                setSearchQuery('');
+                setSelectedCategory('All');
+              }}
               className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition-colors"
             >
               Add First Item
@@ -560,12 +612,7 @@ export default function ItemList() {
       )}
 
       {/* ── Modals ── */}
-      {showAddModal && (
-        <ItemFormModal
-          onSave={handleAdd}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
+      {showAddModal && <ItemFormModal onSave={handleAdd} onClose={() => setShowAddModal(false)} />}
       {editingItem && (
         <ItemFormModal
           item={editingItem}

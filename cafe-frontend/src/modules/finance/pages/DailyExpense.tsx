@@ -114,7 +114,7 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-500">No expenses found</p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto leading-relaxed">
               {hasFilters
                 ? 'Try adjusting your filters or search query'
                 : 'No expenses recorded for this period'}
@@ -135,16 +135,16 @@ interface MonthNavigatorProps {
 
 function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorProps) {
   return (
-    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 shadow-sm">
+    <div className="flex items-center justify-between sm:justify-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 shadow-sm w-full sm:w-auto">
       <button
         type="button"
         onClick={onPrev}
         aria-label="Previous month"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+        className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
       >
-        <ChevronLeft size={15} />
+        <ChevronLeft size={16} />
       </button>
-      <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center select-none px-1">
+      <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center select-none px-2">
         {label}
       </span>
       <button
@@ -152,9 +152,9 @@ function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorPr
         onClick={onNext}
         disabled={disableNext}
         aria-label="Next month"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
       >
-        <ChevronRight size={15} />
+        <ChevronRight size={16} />
       </button>
     </div>
   );
@@ -191,16 +191,17 @@ function MiniStat({
   valueColor = 'text-slate-800',
 }: MiniStatProps) {
   return (
-    <div className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-      <div className={`p-2.5 rounded-xl shrink-0 ${iconBg}`}>
+    <div className="flex items-center gap-2.5 sm:gap-3 p-3 sm:p-3.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl shrink-0 ${iconBg}`}>
         <Icon size={16} strokeWidth={2.5} className={iconColor} />
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1 truncate">
           {label}
         </p>
         <p
-          className={`text-base font-extrabold tabular-nums tracking-tight leading-none ${valueColor}`}
+          className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight leading-none truncate ${valueColor}`}
+          title={value}
         >
           {value}
         </p>
@@ -439,7 +440,7 @@ export default function DailyExpense() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-5 animate-in fade-in zoom-in-95">
+    <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-8 animate-in fade-in zoom-in-95">
       <ManagerPasswordModal
         isOpen={passwordModal.isOpen}
         onClose={handlePasswordClose}
@@ -457,27 +458,33 @@ export default function DailyExpense() {
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-5 md:p-6 bg-gradient-to-r from-rose-50 via-white to-slate-50 border-b border-slate-100">
+        <div className="p-4 md:p-6 bg-gradient-to-r from-rose-50 via-white to-slate-50 border-b border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-rose-100 rounded-xl text-rose-600 shadow-sm">
-                <TrendingDown size={20} />
+              <div className="p-2 sm:p-2.5 bg-rose-100 rounded-lg sm:rounded-xl text-rose-600 shadow-sm shrink-0">
+                <TrendingDown size={20} className="sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-800">Master Expense Register</h3>
-                <p className="text-xs text-slate-500">Monthly expense tracking &amp; management</p>
+                <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
+                  Master Expense Register
+                </h3>
+                <p className="text-[11px] sm:text-xs text-slate-500">
+                  Monthly expense tracking &amp; management
+                </p>
               </div>
             </div>
-            <MonthNavigator
-              label={monthLabel}
-              onPrev={goToPrevMonth}
-              onNext={goToNextMonth}
-              disableNext={isCurrentMonth}
-            />
+            <div className="w-full sm:w-auto">
+              <MonthNavigator
+                label={monthLabel}
+                onPrev={goToPrevMonth}
+                onNext={goToNextMonth}
+                disableNext={isCurrentMonth}
+              />
+            </div>
           </div>
 
-          {/* Stat cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Stat cards - Grid updated for better mobile layout */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             <MiniStat
               label="Total Expenses"
               value={`${monthlyTotal.toLocaleString()} ৳`}
@@ -516,55 +523,57 @@ export default function DailyExpense() {
 
       {/* ── Analytics Row ───────────────────────────────────────────────── */}
       {expenseTransactions.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           {/* Daily spend chart */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-700">Daily Spend Pattern</h4>
-                <p className="text-xs text-slate-400 mt-0.5">{monthLabel}</p>
+                <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">{monthLabel}</p>
               </div>
-              <span className="text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+              <span className="text-[10px] sm:text-xs font-semibold text-slate-400 bg-slate-50 border border-slate-200 px-2 sm:px-2.5 py-1 rounded-lg whitespace-nowrap">
                 {activeDays} active days
               </span>
             </div>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={dailyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval={dailyChartData.length > 20 ? 4 : 2}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-                  width={36}
-                />
-                <RechartsTooltip content={<DailyExpenseTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={28}>
-                  {dailyChartData.map((entry) => (
-                    <Cell
-                      key={`cell-${entry.day}`}
-                      fill={entry.amount > 0 ? '#fb7185' : '#f1f5f9'}
-                      opacity={entry.amount > 0 ? 1 : 0.4}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="w-full -ml-2 sm:ml-0">
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={dailyChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={dailyChartData.length > 20 ? 4 : 2}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#94a3b8' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                    width={32}
+                  />
+                  <RechartsTooltip content={<DailyExpenseTooltip />} cursor={{ fill: '#f1f5f9' }} />
+                  <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                    {dailyChartData.map((entry) => (
+                      <Cell
+                        key={`cell-${entry.day}`}
+                        fill={entry.amount > 0 ? '#fb7185' : '#f1f5f9'}
+                        opacity={entry.amount > 0 ? 1 : 0.4}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Sidebar panels */}
           <div className="flex flex-col gap-4">
             {/* Payment method breakdown */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex-1">
               <h4 className="text-sm font-bold text-slate-700 mb-3">Payment Methods</h4>
-              <div className="space-y-2.5">
+              <div className="space-y-3 sm:space-y-2.5">
                 {(Object.entries(METHOD_CONFIG) as [string, (typeof METHOD_CONFIG)[string]][]).map(
                   ([key, cfg]) => {
                     const amount = methodBreakdown[key as keyof typeof methodBreakdown];
@@ -573,9 +582,9 @@ export default function DailyExpense() {
                     return (
                       <div key={key} className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             <div className={`p-1.5 rounded-lg ${cfg.bg}`}>
-                              <Icon size={12} className={cfg.color} />
+                              <Icon size={14} className={cfg.color} />
                             </div>
                             <span className="text-xs font-semibold text-slate-600">
                               {cfg.label}
@@ -585,7 +594,9 @@ export default function DailyExpense() {
                             <span className="text-xs font-bold text-slate-700">
                               {amount.toLocaleString()} ৳
                             </span>
-                            <span className="text-[10px] text-slate-400 ml-1.5">{pct}%</span>
+                            <span className="text-[10px] text-slate-400 ml-1.5 w-6 inline-block">
+                              {pct}%
+                            </span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -609,9 +620,9 @@ export default function DailyExpense() {
 
             {/* Top suppliers */}
             {topSuppliers.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex-1">
                 <h4 className="text-sm font-bold text-slate-700 mb-3">Top Suppliers</h4>
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {topSuppliers.map(({ name, total }, idx) => (
                     <div key={name} className="flex items-center gap-2.5">
                       <span className="text-[10px] font-bold text-slate-400 w-4 shrink-0">
@@ -619,10 +630,10 @@ export default function DailyExpense() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-semibold text-slate-600 truncate">
+                          <span className="text-xs font-semibold text-slate-600 truncate mr-2">
                             {name}
                           </span>
-                          <span className="text-xs font-bold text-slate-700 tabular-nums shrink-0 ml-2">
+                          <span className="text-xs font-bold text-slate-700 tabular-nums shrink-0">
                             {total.toLocaleString()} ৳
                           </span>
                         </div>
@@ -646,91 +657,99 @@ export default function DailyExpense() {
 
       {/* ── Table Card ──────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Filter bar */}
+        {/* Filter bar - Refactored for Mobile Layout */}
         <div className="p-4 md:p-5 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            {/* Search */}
-            <div className="relative flex-1 min-w-0 w-full sm:max-w-xs">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="text"
-                placeholder="Search description or supplier…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-300 transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              )}
+          <div className="flex flex-col space-y-3 sm:space-y-4">
+            {/* Top Row: Search & Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Search */}
+              <div className="relative w-full sm:max-w-xs">
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Search description or supplier…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-9 py-2 sm:py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-200 focus:border-rose-300 transition-colors"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Actions (Export / Clear) */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <div className="shrink-0">
+                  <ExportDropdown config={exportConfig} disabled={filteredExpenses.length === 0} />
+                </div>
+              </div>
             </div>
 
-            {/* Type filter */}
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shrink-0">
-              {(['all', 'fixed', 'variable'] as const).map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setTypeFilter(val)}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors capitalize ${
-                    typeFilter === val
-                      ? 'bg-rose-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {val === 'all' ? 'All Types' : val}
-                </button>
-              ))}
-            </div>
+            {/* Bottom Row: Filter Pills (Horizontal scroll on mobile) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {/* Type filter */}
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shrink-0">
+                {(['all', 'fixed', 'variable'] as const).map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setTypeFilter(val)}
+                    className={`px-3 py-1.5 sm:py-1 text-[11px] font-bold rounded-md transition-colors capitalize whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 ${
+                      typeFilter === val
+                        ? 'bg-rose-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {val === 'all' ? 'All Types' : val}
+                  </button>
+                ))}
+              </div>
 
-            {/* Method filter */}
-            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shrink-0">
-              {(['all', 'cash', 'bank', 'bkash'] as const).map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setMethodFilter(val)}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-colors capitalize ${
-                    methodFilter === val
-                      ? 'bg-slate-700 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {val === 'all'
-                    ? 'All'
-                    : val === 'bkash'
-                      ? 'bKash'
-                      : val.charAt(0).toUpperCase() + val.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 sm:ml-auto shrink-0">
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
-                >
-                  Clear filters
-                </button>
-              )}
-              <ExportDropdown config={exportConfig} disabled={filteredExpenses.length === 0} />
+              {/* Method filter */}
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shrink-0">
+                {(['all', 'cash', 'bank', 'bkash'] as const).map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setMethodFilter(val)}
+                    className={`px-3 py-1.5 sm:py-1 text-[11px] font-bold rounded-md transition-colors capitalize whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+                      methodFilter === val
+                        ? 'bg-slate-700 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {val === 'all'
+                      ? 'All'
+                      : val === 'bkash'
+                        ? 'bKash'
+                        : val.charAt(0).toUpperCase() + val.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Results summary */}
           {hasActiveFilters && (
-            <p className="text-[11px] text-slate-500 mt-2.5">
+            <p className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-200/60">
               Showing <span className="font-bold text-slate-700">{filteredExpenses.length}</span> of{' '}
               <span className="font-bold text-slate-700">{expenseTransactions.length}</span>{' '}
               expenses
@@ -738,15 +757,15 @@ export default function DailyExpense() {
           )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 hover:scrollbar-thumb-slate-400">
-          <table className="w-full text-left min-w-[900px]">
+        {/* Table - Edge to Edge responsive scroll */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 hover:scrollbar-thumb-slate-400">
+          <table className="w-full text-left min-w-[750px]">
             <thead className="bg-slate-50 border-b-2 border-slate-200 sticky top-0 z-10">
               <tr>
                 {TABLE_COLUMNS.map((col) => (
                   <th
                     key={col}
-                    className={`px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider${
+                    className={`px-4 sm:px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider${
                       RIGHT_ALIGNED_COLUMNS.has(col) ? ' text-right' : ''
                     }`}
                   >
@@ -764,30 +783,30 @@ export default function DailyExpense() {
                   const methodCfg = METHOD_CONFIG[t.method ?? 'cash'];
                   const MethodIcon = methodCfg?.icon;
                   return (
-                    <tr key={t.id} className="hover:bg-rose-50/30 transition-colors group">
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
+                    <tr key={t.id} className="hover:bg-rose-50/40 transition-colors group">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs font-medium text-slate-600 whitespace-nowrap">
                         {t.date?.toLocaleDateString('en-GB', {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric',
                         })}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5">
                         <span
                           className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${typeConfig.className}`}
                         >
                           {typeConfig.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-700 max-w-[220px]">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs text-slate-700 max-w-[180px] sm:max-w-[220px]">
                         <span className="line-clamp-1">{t.description}</span>
                         {t.category && (
-                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                          <span className="text-[10px] text-slate-400 block mt-1">
                             {t.category}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs text-slate-500">
                         {t.supplier ? (
                           <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5 text-[11px] font-medium text-slate-600">
                             {t.supplier}
@@ -796,41 +815,42 @@ export default function DailyExpense() {
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5">
                         {methodCfg ? (
                           <span
-                            className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-md ${methodCfg.bg} ${methodCfg.color}`}
+                            className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-md whitespace-nowrap ${methodCfg.bg} ${methodCfg.color}`}
                           >
-                            {MethodIcon && <MethodIcon size={11} />}
+                            {MethodIcon && <MethodIcon size={12} />}
                             {methodCfg.label}
                           </span>
                         ) : (
                           <span className="text-xs text-slate-500 capitalize">{t.method}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-extrabold text-rose-600 tabular-nums">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
+                        <span className="text-sm font-extrabold text-rose-600 tabular-nums whitespace-nowrap">
                           -{t.amount.toLocaleString()} ৳
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5">
                         {canMutate && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                          // Opacity remains 100% on touch devices, only hides on desktop until hover
+                          <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               onClick={() => handleManagerEdit(t)}
                               aria-label="Edit transaction (Manager Only)"
                               title="Edit (Manager Only)"
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                             >
-                              <Pencil size={13} />
+                              <Pencil size={14} />
                             </button>
                             <button
                               onClick={() => handleManagerDelete(t.id)}
                               aria-label="Delete transaction (Manager Only)"
                               title="Delete (Manager Only)"
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         )}
@@ -845,8 +865,8 @@ export default function DailyExpense() {
 
         {/* Footer: record count + pagination */}
         {filteredExpenses.length > 0 && (
-          <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
+          <div className="px-4 sm:px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-500 w-full text-center md:text-left">
               <span className="font-bold text-slate-700">{filteredExpenses.length}</span> expense
               {filteredExpenses.length !== 1 ? 's' : ''} ·{' '}
               <span className="font-bold text-rose-600">
@@ -854,7 +874,9 @@ export default function DailyExpense() {
               </span>{' '}
               total
             </p>
-            <Pagination pagination={pagination} />
+            <div className="w-full md:w-auto">
+              <Pagination pagination={pagination} />
+            </div>
           </div>
         )}
       </div>

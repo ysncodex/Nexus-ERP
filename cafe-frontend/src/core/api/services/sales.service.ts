@@ -53,8 +53,17 @@ export interface SalesStats {
 }
 
 /** Normalize API date strings into Date objects for Transaction consumers. */
-function parseTransaction(t: Transaction & { date: string | Date }): Transaction {
-  return { ...t, date: t.date instanceof Date ? t.date : new Date(t.date) };
+function parseTransaction(t: Transaction & { date: string | Date; createdAt?: string | Date }): Transaction {
+  return {
+    ...t,
+    date: t.date instanceof Date ? t.date : new Date(t.date),
+    createdAt:
+      t.createdAt === undefined
+        ? undefined
+        : t.createdAt instanceof Date
+          ? t.createdAt
+          : new Date(t.createdAt),
+  };
 }
 
 export const salesService = {

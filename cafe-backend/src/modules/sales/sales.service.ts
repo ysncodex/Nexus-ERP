@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
-import { parseBusinessDate } from '../../utils/businessDate.js';
+import { resolveTransactionDate } from '../../utils/businessDate.js';
 import { dateRangeWhere, paginate } from '../../utils/query.js';
 import type { SaleCreateInput, SaleUpdateInput } from './sales.schema.js';
 
@@ -49,7 +49,7 @@ function buildTransactionData(data: SaleCreateInput) {
     channel: data.channel,
     amount: data.amount,
     description: data.description ?? '',
-    date: parseBusinessDate(data.date),
+    date: resolveTransactionDate(data.date),
     orderNumber: data.orderNumber,
     receiptStatus:
       data.receiptStatus ?? (data.orderNumber && !pending ? ('completed' as const) : undefined),
@@ -88,7 +88,7 @@ function buildOrderData(data: SaleCreateInput, lines: OrderItemInput[], saleTran
     cashierName: data.cashier ?? '',
     giftItemCount: data.giftItemCount,
     giftTotalValue: data.giftTotalValue,
-    createdAt: parseBusinessDate(data.date),
+    createdAt: resolveTransactionDate(data.date),
     saleTransactionId,
     items: {
       create: lines.map((line) => ({
@@ -122,7 +122,7 @@ function buildLinkedOrderUpdate(data: SaleUpdateInput) {
   if (data.cashier !== undefined) patch.cashierName = data.cashier;
   if (data.giftItemCount !== undefined) patch.giftItemCount = data.giftItemCount;
   if (data.giftTotalValue !== undefined) patch.giftTotalValue = data.giftTotalValue;
-  if (data.date !== undefined) patch.createdAt = parseBusinessDate(data.date);
+  if (data.date !== undefined) patch.createdAt = resolveTransactionDate(data.date);
   if (data.orderNumber !== undefined) patch.orderNumber = data.orderNumber;
 
   return patch;
@@ -172,7 +172,7 @@ export async function listSaleRecords(query: {
       ...dateRangeWhere(query.startDate, query.endDate),
     },
     include: { order: true },
-    orderBy: { date: 'desc' },
+    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     skip,
     take,
   });
@@ -209,7 +209,7 @@ export async function updateSaleRecord(id: string, data: SaleUpdateInput) {
       ...(completingPayment && data.paymentMethod ? { method: data.paymentMethod } : {}),
       ...(data.amount !== undefined ? { amount: data.amount } : {}),
       ...(data.description !== undefined ? { description: data.description } : {}),
-      ...(data.date !== undefined ? { date: parseBusinessDate(data.date) } : {}),
+      ...(data.date !== undefined ? { date: resolveTransactionDate(data.date) } : {}),
       ...(data.orderNumber !== undefined ? { orderNumber: data.orderNumber } : {}),
       ...(data.receiptStatus !== undefined ? { receiptStatus: data.receiptStatus } : {}),
       ...(data.posChannel !== undefined ? { posChannel: data.posChannel } : {}),
@@ -265,7 +265,7 @@ export async function saleStatsRecords(query: { startDate?: string; endDate?: st
 export async function recentSaleRecords(limit: number) {
   return prisma.transaction.findMany({
     where: { type: 'sale' },
-    orderBy: { date: 'desc' },
+    orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     take: limit,
   });
 }

@@ -41,6 +41,8 @@ export interface Transaction {
   unitPrice?: number;
   supplier?: string;
   date: Date;
+  /** Row insert time from the API — used for legacy sort/receipt when date was UTC-noon. */
+  createdAt?: Date;
   /** Staff member named on the printed receipt. */
   cashier?: string;
   /** Loyalty / walk-in customer label for the register. */

@@ -14,6 +14,9 @@
 /** Fixed business timezone offset in minutes (Asia/Dhaka = UTC+6). */
 export const BUSINESS_UTC_OFFSET_MINUTES = 6 * 60;
 
+/** IANA timezone for receipt labels and business-day display. */
+export const BUSINESS_TIMEZONE = 'Asia/Dhaka';
+
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** YYYY-MM-DD calendar-day key (in the business timezone) for any instant. */
@@ -41,6 +44,44 @@ export function parseBusinessDate(input: string | Date): Date {
   const key = businessDateKey(input);
   const [y, m, d] = key.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0, 0));
+}
+
+/**
+ * Resolve a value for ledger / POS storage.
+ * Date-picker keys (YYYY-MM-DD) → UTC noon of that business day.
+ * Full ISO datetimes → preserve the exact instant (order creation time).
+ */
+export function resolveTransactionDate(input: string | Date): Date {
+  if (input instanceof Date) return input;
+
+  const trimmed = input.trim();
+  if (DATE_ONLY_RE.test(trimmed)) return parseBusinessDate(trimmed);
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return parseBusinessDate(trimmed);
+  return parsed;
+}
+
+/** Format time in the business timezone (receipts, order history). */
+export function formatBusinessTime(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleTimeString('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Format calendar date in the business timezone. */
+export function formatBusinessDateLabel(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('en-GB', {
+    timeZone: BUSINESS_TIMEZONE,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 /** Convert an explicit calendar day (from a date picker) to the canonical ISO instant. */

@@ -11,6 +11,7 @@
  */
 
 import type { NewOrderData } from '../types/menuItem.types';
+import { formatBusinessDateLabel, formatBusinessTime } from '@/shared/utils/businessDate';
 
 // ─── Business identity ──────────────────────────────────────────────────────
 
@@ -44,19 +45,11 @@ export function money(n: number): string {
 }
 
 export function receiptTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return formatBusinessTime(iso);
 }
 
 export function receiptDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return formatBusinessDateLabel(iso);
 }
 
 function esc(value: string | number): string {

@@ -81,7 +81,9 @@ function AmountCell({
         : 'text-rose-500'
       : 'text-slate-700';
   return (
-    <span className={`inline-flex items-center gap-1.5 font-semibold tabular-nums ${color}`}>
+    <span
+      className={`inline-flex items-center justify-end gap-1.5 font-semibold tabular-nums whitespace-nowrap ${color}`}
+    >
       {dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />}
       {fmt(value)} ৳
     </span>
@@ -107,20 +109,25 @@ function SummaryCard({
   sub?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-      <div className={`p-2.5 rounded-xl shrink-0 ${iconBg}`}>
+    <div className="flex items-center gap-2.5 sm:gap-3 p-3 sm:p-4 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+      <div className={`p-2 sm:p-2.5 rounded-lg sm:rounded-xl shrink-0 ${iconBg}`}>
         <Icon size={16} strokeWidth={2.5} className={iconColor} />
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5 truncate">
           {label}
         </p>
         <p
-          className={`text-sm font-extrabold tabular-nums tracking-tight leading-none ${valueColor}`}
+          className={`text-sm sm:text-base font-extrabold tabular-nums tracking-tight leading-none truncate ${valueColor}`}
+          title={value}
         >
           {value}
         </p>
-        {sub && <p className="text-[10px] text-slate-400 mt-1 leading-none">{sub}</p>}
+        {sub && (
+          <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 leading-none truncate">
+            {sub}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -140,16 +147,16 @@ interface MonthNavigatorProps {
 
 function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorProps) {
   return (
-    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 shadow-sm">
+    <div className="flex items-center justify-between sm:justify-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 shadow-sm w-full sm:w-auto">
       <button
         type="button"
         onClick={onPrev}
         aria-label="Previous month"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+        className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
-        <ChevronLeft size={15} />
+        <ChevronLeft size={16} />
       </button>
-      <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center select-none px-1">
+      <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center select-none px-2">
         {label}
       </span>
       <button
@@ -157,9 +164,9 @@ function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorPr
         onClick={onNext}
         disabled={disableNext}
         aria-label="Next month"
-        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
-        <ChevronRight size={15} />
+        <ChevronRight size={16} />
       </button>
     </div>
   );
@@ -442,7 +449,7 @@ export default function DailyRecord() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 pb-20 sm:pb-0">
       {/* ── Modals ── */}
       <ManagerPasswordModal
         isOpen={passwordModalOpen}
@@ -458,8 +465,8 @@ export default function DailyRecord() {
 
       {/* Edit Modal */}
       {editModalOpen && editingRecord && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-lg p-5 sm:p-6 pb-8 sm:pb-6 animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-6">
               <div className="bg-indigo-100 p-3 rounded-xl text-indigo-600">
                 <Pencil size={20} />
@@ -471,10 +478,12 @@ export default function DailyRecord() {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+
+            {/* Grid fix: 1 col on mobile, 3 on desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-3">
               {(['cashSales', 'bkashSales', 'bankSales'] as const).map((k) => (
                 <div key={k}>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">
                     {k === 'cashSales' ? 'Cash' : k === 'bkashSales' ? 'bKash' : 'Bank'}
                   </label>
                   <input
@@ -482,24 +491,24 @@ export default function DailyRecord() {
                     min={0}
                     value={editValues[k]}
                     onChange={(e) => setEditValues((v) => ({ ...v, [k]: Number(e.target.value) }))}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full p-3 sm:p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
                   />
                 </div>
               ))}
             </div>
-            <div className="flex gap-3 pt-6">
+            <div className="flex flex-col sm:flex-row gap-3 pt-6">
               <button
                 onClick={() => {
                   setEditModalOpen(false);
                   setEditingRecord(null);
                 }}
-                className="flex-1 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
+                className="flex-1 py-3 border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdits}
-                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors"
+                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
               >
                 Save Changes
               </button>
@@ -510,8 +519,8 @@ export default function DailyRecord() {
 
       {/* Detail Modal */}
       {detailRecord && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-md p-5 sm:p-6 pb-8 sm:pb-6 animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="bg-slate-100 p-2.5 rounded-xl">
@@ -519,7 +528,7 @@ export default function DailyRecord() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800">Day Details</h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-[11px] sm:text-xs text-slate-500">
                     {new Date(detailRecord.date).toLocaleDateString('en-US', {
                       weekday: 'long',
                       year: 'numeric',
@@ -531,18 +540,19 @@ export default function DailyRecord() {
               </div>
               <button
                 onClick={() => setDetailRecord(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                className="p-2 -mr-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
+
             {/* Revenue breakdown mini-bar */}
             {detailRecord.totalSales > 0 && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-xl">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+              <div className="mb-4 p-3.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
                   Revenue Breakdown
                 </p>
-                <div className="flex h-2 rounded-full overflow-hidden gap-px mb-2">
+                <div className="flex h-2 rounded-full overflow-hidden gap-px mb-2.5">
                   <div
                     className="bg-emerald-400 transition-all"
                     style={{
@@ -562,22 +572,22 @@ export default function DailyRecord() {
                     }}
                   />
                 </div>
-                <div className="flex gap-3 text-[10px] text-slate-500 font-semibold">
+                <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[10px] sm:text-xs text-slate-500 font-semibold">
                   {detailRecord.cashSales > 0 && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                       Cash {((detailRecord.cashSales / detailRecord.totalSales) * 100).toFixed(0)}%
                     </span>
                   )}
                   {detailRecord.bkashSales > 0 && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 inline-block" />
                       bKash {((detailRecord.bkashSales / detailRecord.totalSales) * 100).toFixed(0)}
                       %
                     </span>
                   )}
                   {detailRecord.bankSales > 0 && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block" />
                       Bank {((detailRecord.bankSales / detailRecord.totalSales) * 100).toFixed(0)}%
                     </span>
@@ -596,16 +606,16 @@ export default function DailyRecord() {
               ].map((row) => (
                 <div
                   key={row.label}
-                  className={`flex justify-between items-center py-1.5 ${row.bold ? 'border-t border-slate-100 pt-2.5 mt-1' : ''}`}
+                  className={`flex justify-between items-center py-2 sm:py-1.5 ${row.bold ? 'border-t border-slate-100 pt-3 sm:pt-2.5 mt-1' : ''}`}
                 >
                   <span
-                    className={`text-xs flex items-center gap-2 ${row.bold ? 'font-bold text-slate-700' : 'text-slate-500'}`}
+                    className={`text-xs sm:text-sm flex items-center gap-2 ${row.bold ? 'font-bold text-slate-700' : 'text-slate-500'}`}
                   >
-                    {row.dot && <span className={`w-1.5 h-1.5 rounded-full ${row.dot}`} />}
+                    {row.dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${row.dot}`} />}
                     {row.label}
                   </span>
                   <span
-                    className={`text-xs font-bold tabular-nums ${
+                    className={`text-xs sm:text-sm font-bold tabular-nums ${
                       row.negative && row.value > 0
                         ? 'text-rose-500'
                         : row.bold
@@ -627,15 +637,15 @@ export default function DailyRecord() {
                     ? ((grossProfit / detailRecord.totalSales) * 100).toFixed(1)
                     : '0.0';
                 return (
-                  <div className="border-t border-dashed border-slate-200 pt-2.5 mt-1 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-600">
+                  <div className="border-t border-dashed border-slate-200 pt-3 sm:pt-2.5 mt-1 flex flex-wrap justify-between items-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-600 flex items-center">
                       Gross Profit
-                      <span className="ml-2 text-[10px] font-semibold text-slate-400">
-                        ({margin}% margin)
+                      <span className="ml-2 text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
+                        {margin}% margin
                       </span>
                     </span>
                     <span
-                      className={`text-xs font-bold tabular-nums ${grossProfit >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+                      className={`text-xs sm:text-sm font-bold tabular-nums ${grossProfit >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
                     >
                       {grossProfit >= 0 ? '+' : ''}
                       {fmt(grossProfit)} ৳
@@ -644,10 +654,10 @@ export default function DailyRecord() {
                 );
               })()}
 
-              <div className="border-t-2 border-slate-200 pt-3 mt-1 flex justify-between items-center">
-                <span className="text-sm font-bold text-slate-700">Net Cash Flow</span>
+              <div className="border-t-2 border-slate-200 pt-3 mt-2 flex justify-between items-center">
+                <span className="text-sm sm:text-base font-bold text-slate-700">Net Cash Flow</span>
                 <span
-                  className={`text-base font-extrabold tabular-nums ${detailRecord.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+                  className={`text-base sm:text-lg font-extrabold tabular-nums ${detailRecord.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
                 >
                   {detailRecord.dailyAvail >= 0 ? '+' : ''}
                   {fmt(detailRecord.dailyAvail)} ৳
@@ -659,25 +669,31 @@ export default function DailyRecord() {
       )}
 
       {/* ── Page Header ── */}
-      <div className="p-5 md:p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-slate-50">
+      <div className="p-4 md:p-6 border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-white to-slate-50">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-100 rounded-xl text-indigo-600 shadow-sm">
-              <Calendar size={20} />
+            <div className="p-2 sm:p-2.5 bg-indigo-100 rounded-lg sm:rounded-xl text-indigo-600 shadow-sm shrink-0">
+              <Calendar size={20} className="sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-800 leading-tight">Daily Records</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Aggregated day-by-day performance</p>
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
+                Daily Records
+              </h3>
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                Aggregated day-by-day performance
+              </p>
             </div>
             {enrichedRecords.length > 0 && (
-              <span className="hidden sm:inline-flex bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full tabular-nums">
+              <span className="hidden sm:inline-flex bg-indigo-50 text-indigo-600 border border-indigo-100 text-xs font-bold px-2.5 py-1 rounded-full tabular-nums ml-2">
                 {enrichedRecords.length} days
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <ExportDropdown config={exportConfig} disabled={sortedRecords.length === 0} />
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            <div className="flex justify-end w-full sm:w-auto">
+              <ExportDropdown config={exportConfig} disabled={sortedRecords.length === 0} />
+            </div>
             <MonthNavigator
               label={monthLabel}
               onPrev={goToPrevMonth}
@@ -702,9 +718,9 @@ export default function DailyRecord() {
               ? Math.round((summaryStats.profitableDays / summaryStats.days) * 100)
               : 0;
           return (
-            <div className="p-5 md:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/60 to-white space-y-4">
-              {/* Stat cards grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="p-4 md:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50/60 to-white space-y-4">
+              {/* Stat cards grid - Mobile optimized columns */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
                 <SummaryCard
                   label="Total Revenue"
                   value={`${summaryStats.totalRevenue.toLocaleString()} ৳`}
@@ -748,14 +764,14 @@ export default function DailyRecord() {
               </div>
 
               {/* Revenue channel split + best/worst day row */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
                 {/* Revenue breakdown bar */}
                 {totalRevForBar > 0 && (
                   <div className="flex-1 min-w-0 bg-white border border-slate-100 rounded-xl p-3.5 shadow-sm">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">
                       Revenue Channels
                     </p>
-                    <div className="flex h-2 rounded-full overflow-hidden gap-px mb-2">
+                    <div className="flex h-2 rounded-full overflow-hidden gap-px mb-2.5">
                       <div
                         className="bg-emerald-400 transition-all"
                         style={{ width: `${cashPct}%` }}
@@ -766,22 +782,22 @@ export default function DailyRecord() {
                       />
                       <div className="bg-sky-400 transition-all" style={{ width: `${bankPct}%` }} />
                     </div>
-                    <div className="flex gap-4 text-[10px] font-semibold text-slate-500">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] sm:text-xs font-semibold text-slate-500">
                       {cashPct > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0" />
                           Cash {cashPct}%
                         </span>
                       )}
                       {bkashPct > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 inline-block" />
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-400 inline-block shrink-0" />
                           bKash {bkashPct}%
                         </span>
                       )}
                       {bankPct > 0 && (
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block" />
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block shrink-0" />
                           Bank {bankPct}%
                         </span>
                       )}
@@ -790,36 +806,36 @@ export default function DailyRecord() {
                 )}
 
                 {/* Best / Worst day callouts */}
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3.5 py-2.5">
-                    <span className="text-sm">★</span>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 shrink-0">
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex-1 sm:flex-none">
+                    <span className="text-sm shrink-0">★</span>
                     <div>
-                      <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none mb-0.5">
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-none mb-1">
                         Best Day
                       </p>
-                      <p className="text-xs font-bold text-emerald-800 tabular-nums">
+                      <p className="text-xs sm:text-sm font-bold text-emerald-800 tabular-nums">
                         {summaryStats.bestDay.date.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })}{' '}
-                        <span className="text-[10px] font-semibold text-emerald-600">
+                        <span className="text-[10px] sm:text-xs font-semibold text-emerald-600 ml-1">
                           {summaryStats.bestDay.totalSales.toLocaleString()} ৳
                         </span>
                       </p>
                     </div>
                   </div>
                   {summaryStats.worstDay.dailyAvail < 0 && (
-                    <div className="flex items-center gap-2.5 bg-rose-50 border border-rose-100 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center gap-3 bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 flex-1 sm:flex-none">
                       <div>
-                        <p className="text-[9px] font-bold text-rose-600 uppercase tracking-widest leading-none mb-0.5">
+                        <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest leading-none mb-1">
                           Worst Day
                         </p>
-                        <p className="text-xs font-bold text-rose-800 tabular-nums">
+                        <p className="text-xs sm:text-sm font-bold text-rose-800 tabular-nums">
                           {summaryStats.worstDay.date.toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                           })}{' '}
-                          <span className="text-[10px] font-semibold text-rose-600">
+                          <span className="text-[10px] sm:text-xs font-semibold text-rose-600 ml-1">
                             {summaryStats.worstDay.dailyAvail.toLocaleString()} ৳ net
                           </span>
                         </p>
@@ -833,8 +849,10 @@ export default function DailyRecord() {
         })()}
 
       {/* ── Table ── */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
-        <table className={`w-full text-left ${canEdit ? 'min-w-[1380px]' : 'min-w-[1280px]'}`}>
+      <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 hover:scrollbar-thumb-slate-400">
+        <table
+          className={`w-full text-left ${canEdit ? 'min-w-[1100px] sm:min-w-[1380px]' : 'min-w-[1000px] sm:min-w-[1280px]'}`}
+        >
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-slate-50 border-b-2 border-slate-200 shadow-sm">
             <tr>
@@ -842,9 +860,11 @@ export default function DailyRecord() {
                 <th
                   key={col.field}
                   onClick={() => handleSort(col.field)}
-                  className={`px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100 transition-colors group ${col.right ? 'text-right' : ''}`}
+                  className={`px-4 sm:px-5 py-3.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider cursor-pointer select-none hover:bg-slate-100 transition-colors group ${col.right ? 'text-right' : ''}`}
                 >
-                  <div className={`flex items-center gap-1.5 ${col.right ? 'justify-end' : ''}`}>
+                  <div
+                    className={`flex items-center gap-1.5 whitespace-nowrap ${col.right ? 'justify-end' : ''}`}
+                  >
                     {col.dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${col.dot}`} />}
                     {col.label}
                     <SortIcon field={col.field} />
@@ -852,7 +872,7 @@ export default function DailyRecord() {
                 </th>
               ))}
               {/* Actions column */}
-              <th className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right w-16">
+              <th className="px-4 sm:px-5 py-3.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider text-right w-16">
                 Actions
               </th>
             </tr>
@@ -868,7 +888,7 @@ export default function DailyRecord() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-500">No records found</p>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-slate-400 mt-1 max-w-[200px] mx-auto leading-relaxed">
                         Switch to a different month to view daily records
                       </p>
                     </div>
@@ -885,7 +905,7 @@ export default function DailyRecord() {
                 >
                   {/* Date — left border indicates profit/loss status */}
                   <td
-                    className={`px-4 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap border-l-2 ${
+                    className={`px-4 sm:px-5 py-3 sm:py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap border-l-2 ${
                       r.dailyAvail > 0
                         ? 'border-emerald-400'
                         : r.dailyAvail < 0
@@ -901,8 +921,8 @@ export default function DailyRecord() {
                   </td>
 
                   {/* Total Sales */}
-                  <td className="px-4 py-2.5 text-right text-xs">
-                    <span className="font-bold tabular-nums text-slate-800">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
+                    <span className="font-bold tabular-nums text-slate-800 whitespace-nowrap">
                       {r.totalSales > 0 ? (
                         `${fmt(r.totalSales)} ৳`
                       ) : (
@@ -912,24 +932,24 @@ export default function DailyRecord() {
                   </td>
 
                   {/* Cash Received */}
-                  <td className="px-4 py-2.5 text-right text-xs">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     <AmountCell value={r.cashSales} dot="bg-emerald-500" neutral />
                   </td>
 
                   {/* bKash Received */}
-                  <td className="px-4 py-2.5 text-right text-xs">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     <AmountCell value={r.bkashSales} dot="bg-fuchsia-500" neutral />
                   </td>
 
                   {/* Bank Transfer */}
-                  <td className="px-4 py-2.5 text-right text-xs">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     <AmountCell value={r.bankSales} dot="bg-sky-500" neutral />
                   </td>
 
                   {/* Total Expenses */}
-                  <td className="px-4 py-2.5 text-right text-xs">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     {r.dailyCosts > 0 ? (
-                      <span className="text-rose-500 font-semibold tabular-nums">
+                      <span className="text-rose-500 font-semibold tabular-nums whitespace-nowrap">
                         -{fmt(r.dailyCosts)} ৳
                       </span>
                     ) : (
@@ -938,9 +958,9 @@ export default function DailyRecord() {
                   </td>
 
                   {/* Net Cash Flow */}
-                  <td className="px-4 py-2.5 text-right text-xs">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     <span
-                      className={`font-bold tabular-nums ${r.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+                      className={`font-bold tabular-nums whitespace-nowrap ${r.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
                     >
                       {r.dailyAvail >= 0 ? '+' : ''}
                       {fmt(r.dailyAvail)} ৳
@@ -948,7 +968,7 @@ export default function DailyRecord() {
                   </td>
 
                   {/* Actions */}
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right">
                     <div
                       className="relative inline-block"
                       ref={openMenuDate === r.date.toISOString() ? menuRef : undefined}
@@ -959,22 +979,22 @@ export default function DailyRecord() {
                             d === r.date.toISOString() ? null : r.date.toISOString()
                           )
                         }
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                        className="p-2 sm:p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                         title="Actions"
                       >
-                        <MoreHorizontal size={15} />
+                        <MoreHorizontal size={16} />
                       </button>
 
                       {openMenuDate === r.date.toISOString() && (
-                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 animate-in fade-in zoom-in-95 duration-100">
+                        <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1.5 animate-in fade-in zoom-in-95 duration-100">
                           <button
                             onClick={() => {
                               setDetailRecord(r);
                               setOpenMenuDate(null);
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:bg-slate-50"
                           >
-                            <Eye size={13} />
+                            <Eye size={14} />
                             View Details
                           </button>
                           {canEdit && (
@@ -983,9 +1003,9 @@ export default function DailyRecord() {
                                 setOpenMenuDate(null);
                                 handleManagerEdit(r);
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              className="w-full flex items-center gap-2.5 px-4 py-2.5 sm:py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:bg-indigo-50"
                             >
-                              <Pencil size={13} />
+                              <Pencil size={14} />
                               Edit Sales
                             </button>
                           )}
@@ -1002,38 +1022,38 @@ export default function DailyRecord() {
           {enrichedRecords.length > 0 && (
             <tfoot className="sticky bottom-0 z-10 bg-slate-100 border-t-2 border-slate-300">
               <tr>
-                <td className="px-4 py-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap border-l-2 border-slate-400">
+                <td className="px-4 sm:px-5 py-3.5 text-[11px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap border-l-2 border-slate-400">
                   Total ({enrichedRecords.length} days)
                 </td>
                 {/* Total Sales footer */}
-                <td className="px-4 py-3 text-right">
-                  <span className="text-xs font-bold text-slate-900 tabular-nums">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-slate-900 tabular-nums whitespace-nowrap">
                     {fmt(totals.cashSales + totals.bkashSales + totals.bankSales)} ৳
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <span className="text-xs font-bold text-slate-800 tabular-nums">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-slate-800 tabular-nums whitespace-nowrap">
                     {fmt(totals.cashSales)} ৳
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <span className="text-xs font-bold text-slate-800 tabular-nums">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-slate-800 tabular-nums whitespace-nowrap">
                     {fmt(totals.bkashSales)} ৳
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <span className="text-xs font-bold text-slate-800 tabular-nums">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-slate-800 tabular-nums whitespace-nowrap">
                     {fmt(totals.bankSales)} ৳
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <span className="text-xs font-bold text-rose-500 tabular-nums">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-rose-500 tabular-nums whitespace-nowrap">
                     -{fmt(totals.dailyCosts)} ৳
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 sm:px-5 py-3.5 text-right">
                   <span
-                    className={`text-xs font-bold tabular-nums ${totals.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+                    className={`text-xs font-bold tabular-nums whitespace-nowrap ${totals.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
                   >
                     {totals.dailyAvail >= 0 ? '+' : ''}
                     {fmt(totals.dailyAvail)} ৳
@@ -1048,23 +1068,25 @@ export default function DailyRecord() {
 
       {/* ── Pagination ── */}
       {enrichedRecords.length > 0 && (
-        <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">
+        <div className="px-4 sm:px-5 py-4 sm:py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-xs sm:text-sm text-slate-500 w-full text-center md:text-left leading-relaxed">
             <span className="font-bold text-slate-700">{enrichedRecords.length}</span> day
             {enrichedRecords.length !== 1 ? 's' : ''} ·{' '}
-            <span className="font-bold text-indigo-600">
+            <span className="font-bold text-indigo-600 whitespace-nowrap">
               {(totals.cashSales + totals.bkashSales + totals.bankSales).toLocaleString()} ৳
             </span>{' '}
             total revenue ·{' '}
             <span
-              className={`font-bold ${totals.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
+              className={`font-bold whitespace-nowrap ${totals.dailyAvail >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}
             >
               {totals.dailyAvail >= 0 ? '+' : ''}
               {totals.dailyAvail.toLocaleString()} ৳
             </span>{' '}
             net flow
           </p>
-          <Pagination pagination={pagination} />
+          <div className="w-full md:w-auto">
+            <Pagination pagination={pagination} showPageInfo={false} />
+          </div>
         </div>
       )}
     </div>
