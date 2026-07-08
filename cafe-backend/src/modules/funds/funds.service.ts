@@ -2,7 +2,7 @@ import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { parseBusinessDate } from '../../utils/businessDate.js';
 import { dateRangeWhere, paginate } from '../../utils/query.js';
-import type { FundAccountType, FundMovementType, TransactionType } from '../../generated/prisma/enums.js';
+import type { FundAccountType, FundMovementType } from '../../generated/prisma/enums.js';
 import type { FundMovementCreateInput } from './funds.schema.js';
 
 const FUND_ACCOUNT_TYPES: FundAccountType[] = ['cash', 'bank', 'bkash', 'reserve'];
@@ -34,13 +34,6 @@ async function decrementAccountBalance(accountId: string, amount: number, tx: Db
   const account = await tx.fundAccount.findUnique({ where: { id: accountId } });
   if (!account) throw ApiError.notFound('Source account not found');
 
-  const currentBalance = Number(account.balance);
-  if (currentBalance < amount) {
-    throw ApiError.badRequest(
-      `Insufficient balance in ${account.label}. Available: ৳${currentBalance.toFixed(2)}`,
-    );
-  }
-
   await tx.fundAccount.update({
     where: { id: accountId },
     data: { balance: { decrement: amount } },
@@ -61,7 +54,7 @@ interface MovementAccounts {
 
 async function resolveMovementAccounts(
   data: FundMovementCreateInput,
-  tx: DbClient,
+  tx: DbClient
 ): Promise<MovementAccounts> {
   switch (data.movementType) {
     case 'transfer': {
@@ -88,7 +81,7 @@ async function applyMovementBalanceChanges(
   accounts: MovementAccounts,
   amount: number,
   tx: DbClient,
-  direction: 'forward' | 'reverse',
+  direction: 'forward' | 'reverse'
 ) {
   const sign = direction === 'forward' ? 1 : -1;
 
@@ -121,54 +114,35 @@ async function applyMovementBalanceChanges(
   }
 }
 
-function computeOperationalBalances(transactions: Array<{ type: TransactionType; amount: unknown; method: string | null; receiptStatus: string | null }>) {
-  const operational: Record<FundAccountType, number> = {
-    cash: 0,
-    bank: 0,
-    bkash: 0,
-    reserve: 0,
-  };
-
-  for (const tx of transactions) {
-    const amount = Number(tx.amount);
-    const method = tx.method as FundAccountType | null;
-    if (!method || !(method in operational)) continue;
-
-    if (tx.type === 'sale') {
-      const status = tx.receiptStatus ?? 'completed';
-      if (status === 'completed') operational[method] += amount;
-    } else if (tx.type === 'sale_adjustment') {
-      operational[method] -= amount;
-    } else if (tx.type === 'expense_product' || tx.type === 'expense_fixed') {
-      operational[method] -= amount;
-    }
-  }
-
-  return operational;
-}
-
 export async function createFundMovement(data: FundMovementCreateInput, createdById?: string) {
   const businessDate = parseBusinessDate(data.date);
   const amount = data.amount;
 
-  return prisma.$transaction(async (tx) => {
-    const accounts = await resolveMovementAccounts(data, tx);
+  return prisma.$transaction(
+    async (tx) => {
+      const accounts = await resolveMovementAccounts(data, tx);
 
-    await applyMovementBalanceChanges(data.movementType, accounts, amount, tx, 'forward');
+      await applyMovementBalanceChanges(data.movementType, accounts, amount, tx, 'forward');
 
-    return tx.fundMovement.create({
-      data: {
-        movementType: data.movementType,
-        fromAccountId: accounts.fromAccountId,
-        toAccountId: accounts.toAccountId,
-        amount,
-        transactionDate: businessDate,
-        notes: data.notes?.trim() ?? '',
-        createdById: createdById ?? null,
-      },
-      include: movementInclude,
-    });
-  });
+      return tx.fundMovement.create({
+        data: {
+          movementType: data.movementType,
+          fromAccountId: accounts.fromAccountId,
+          toAccountId: accounts.toAccountId,
+          amount,
+          transactionDate: businessDate,
+          notes: data.notes?.trim() ?? '',
+          createdById: createdById ?? null,
+        },
+        include: movementInclude,
+      });
+    },
+    {
+      // FIX: Increase timeout limits for slower cloud connections
+      maxWait: 10000, // 10 seconds to acquire a connection (default is 2000ms)
+      timeout: 20000, // 20 seconds to complete the transaction (default is 5000ms)
+    }
+  );
 }
 
 export async function deleteFundMovement(id: string) {
@@ -184,10 +158,17 @@ export async function deleteFundMovement(id: string) {
     toAccountId: existing.toAccountId,
   };
 
-  await prisma.$transaction(async (tx) => {
-    await applyMovementBalanceChanges(existing.movementType, accounts, amount, tx, 'reverse');
-    await tx.fundMovement.delete({ where: { id } });
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await applyMovementBalanceChanges(existing.movementType, accounts, amount, tx, 'reverse');
+      await tx.fundMovement.delete({ where: { id } });
+    },
+    {
+      // FIX: Apply the same limits here
+      maxWait: 10000,
+      timeout: 20000,
+    }
+  );
 }
 
 export async function listFundMovements(query: {
@@ -199,8 +180,7 @@ export async function listFundMovements(query: {
 }) {
   const { skip, take } = paginate(query.page, query.limit);
   const dateFilter = dateRangeWhere(query.startDate, query.endDate);
-  const transactionDateFilter =
-    'date' in dateFilter ? { transactionDate: dateFilter.date } : {};
+  const transactionDateFilter = 'date' in dateFilter ? { transactionDate: dateFilter.date } : {};
 
   return prisma.fundMovement.findMany({
     where: {
@@ -229,14 +209,41 @@ export async function listFundAccounts() {
 
 /** Combined balances: operational (sales/expenses) + fund movement adjustments. */
 export async function getCombinedAccountBalances() {
-  const [fundAccounts, transactions] = await Promise.all([
-    prisma.fundAccount.findMany(),
-    prisma.transaction.findMany({
-      select: { type: true, amount: true, method: true, receiptStatus: true },
-    }),
-  ]);
+  // FIX: Removed Promise.all to prevent connection pool exhaustion on serverless databases (like Neon).
+  // We now fetch these one after the other.
+  const fundAccounts = await prisma.fundAccount.findMany();
 
-  const operational = computeOperationalBalances(transactions);
+  const aggregations = await prisma.transaction.groupBy({
+    by: ['type', 'method', 'receiptStatus'],
+    _sum: { amount: true },
+    where: { method: { not: null } },
+  });
+
+  const operational: Record<FundAccountType, number> = {
+    cash: 0,
+    bank: 0,
+    bkash: 0,
+    reserve: 0,
+  };
+
+  // Process the pre-calculated sums from the database
+  for (const group of aggregations) {
+    const amount = Number(group._sum.amount || 0);
+    const method = group.method as FundAccountType;
+
+    if (!(method in operational)) continue;
+
+    if (group.type === 'sale') {
+      if (group.receiptStatus === 'completed') operational[method] += amount;
+    } else if (
+      group.type === 'sale_adjustment' ||
+      group.type === 'expense_product' ||
+      group.type === 'expense_fixed'
+    ) {
+      operational[method] -= amount;
+    }
+  }
+
   const fundAdjustments: Record<FundAccountType, number> = {
     cash: 0,
     bank: 0,
