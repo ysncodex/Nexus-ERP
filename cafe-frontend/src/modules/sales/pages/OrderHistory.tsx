@@ -60,7 +60,11 @@ import {
 } from '@/shared/utils/businessDate';
 import type { Transaction, PaymentMethod, SalesChannel, ReceiptStatus } from '@/core/types';
 import { printOrderAsync } from '../utils/posPrintService';
-import { transactionToOrder, transactionToSaleUpdate, resolveOrderTimestamp } from '../utils/orderUtils';
+import {
+  transactionToOrder,
+  transactionToSaleUpdate,
+  resolveOrderTimestamp,
+} from '../utils/orderUtils';
 import { PaymentPanel } from '../components/PaymentPanel';
 import type { NewOrderData } from '../types/menuItem.types';
 
@@ -581,6 +585,7 @@ function DetailDrawer({
               {[
                 { label: 'Date', value: formatDate(resolveOrderTimestamp(tx)) },
                 { label: 'Time', value: formatTime(resolveOrderTimestamp(tx)) },
+                ...(tx.tableNumber ? [{ label: 'Table', value: tx.tableNumber }] : []),
                 ...(tx.customerName ? [{ label: 'Customer', value: tx.customerName }] : []),
                 ...(tx.cashier ? [{ label: 'Cashier', value: tx.cashier }] : []),
               ].map(({ label, value }) => (
@@ -704,8 +709,6 @@ function DetailDrawer({
               </div>
             </div>
           </section>
-
-          {/* Printable receipt removed — uses centralized posPrintService */}
         </div>
 
         {/* Action footer */}
@@ -1338,7 +1341,7 @@ export default function OrderHistory() {
           </div>
         ) : (
           <DataTable>
-            <DataTableColGroup widths={['26%', '15%', '9%', '12%', '13%', '11%', '14%']} />
+            <DataTableColGroup widths={['22%', '14%', '10%', '8%', '11%', '11%', '11%', '13%']} />
             <DataTableHead>
               <DataTableHeadRow>
                 <DataTableHeadCell align="left">Order</DataTableHeadCell>
@@ -1351,6 +1354,7 @@ export default function OrderHistory() {
                     onSort={handleSort}
                   />
                 </DataTableHeadCell>
+                <DataTableHeadCell align="center">Table</DataTableHeadCell>
                 <DataTableHeadCell align="center">
                   <span className="inline-flex justify-center w-full">
                     <SortBtn
@@ -1432,6 +1436,16 @@ export default function OrderHistory() {
                         <Clock size={10} className="shrink-0" />
                         {formatTime(resolveOrderTimestamp(tx))}
                       </p>
+                    </DataTableCell>
+
+                    <DataTableCell align="center">
+                      {tx.tableNumber ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold border border-slate-200">
+                          {tx.tableNumber}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">—</span>
+                      )}
                     </DataTableCell>
 
                     <DataTableCell align="center">

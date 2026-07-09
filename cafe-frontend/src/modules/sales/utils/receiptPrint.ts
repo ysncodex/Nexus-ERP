@@ -15,7 +15,6 @@ import { formatBusinessDateLabel, formatBusinessTime } from '@/shared/utils/busi
 
 // ─── Business identity ──────────────────────────────────────────────────────
 
-/** ASCII-safe strings — thermal printers render these sharply (no thin accents/dashes). */
 export const RECEIPT_BRAND = {
   name: 'Beans & Butter Cafe',
   tagline: 'Staff Quarter, Demra, Dhaka',
@@ -39,7 +38,6 @@ const CHANNEL_LABELS: Record<string, string> = {
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
-/** Currency uses "Tk" for reliable thermal-printer + cross-font rendering. */
 export function money(n: number): string {
   return `Tk ${Math.round(n).toLocaleString('en-US')}`;
 }
@@ -67,169 +65,78 @@ function discountLabel(order: NewOrderData): string {
   return 'Discount';
 }
 
-// ─── Shared CSS (plain classes — screen preview in POS modal) ───────────────
+// ─── Shared CSS ─────────────────────────────────────────────────────────────
 
 export const RECEIPT_CSS = `
-.rcpt {
-  font-family: 'Courier New', Courier, monospace;
-  color: #111827;
-  width: 100%;
-  font-size: 13px;
-  line-height: 1.5;
-  letter-spacing: 0.08px;
-}
+.rcpt { font-family: 'Courier New', Courier, monospace; color: #111827; width: 100%; font-size: 13px; line-height: 1.5; letter-spacing: 0.08px; }
 .rcpt * { box-sizing: border-box; }
 .rcpt-center { text-align: center; }
-.rcpt-name {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 0.25px;
-  line-height: 1.2;
-}
-.rcpt-title {
-  font-size: 13px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.22px;
-  margin-bottom: 4px;
-}
+.rcpt-name { font-size: 18px; font-weight: 900; letter-spacing: 0.25px; line-height: 1.2; }
+.rcpt-title { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.22px; margin-bottom: 4px; }
 .rcpt-muted { color: #1f2937; }
 .rcpt-sm { font-size: 12px; }
 .rcpt-xs { font-size: 11px; }
-.rcpt-thanks {
-  font-size: 13px;
-  font-weight: 900;
-  margin-bottom: 3px;
-}
+.rcpt-thanks { font-size: 13px; font-weight: 900; margin-bottom: 3px; }
 .rcpt-hr { border: none; border-top: 1.5px solid #111827; margin: 8px 0; }
 .rcpt-hr-solid { border: none; border-top: 3px solid #111827; margin: 9px 0; }
-.rcpt-row {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-  padding: 1px 0;
-}
+.rcpt-row { display: table; width: 100%; table-layout: fixed; padding: 1px 0; }
 .rcpt-row + .rcpt-row { margin-top: 2px; }
 .rcpt-row > span { display: table-cell; vertical-align: top; }
 .rcpt-row > span:last-child { text-align: right; white-space: nowrap; }
-/* Adjusted rcpt-label font-size to be smaller as requested */
 .rcpt-label { color: #111827; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15px; font-size: 11px; }
 .rcpt-strong { font-weight: 900; }
-.rcpt-badge {
-  display: inline-block;
-  background: #111827;
-  color: #fff;
-  font-weight: 800;
-  padding: 3px 10px;
-  letter-spacing: 0.2px;
-}
+.rcpt-badge { display: inline-block; background: #111827; color: #fff; font-weight: 800; padding: 3px 10px; letter-spacing: 0.2px; }
 .rcpt-items { margin: 6px 0; }
-.rcpt-item {
-  margin-bottom: 9px;
-  padding-bottom: 4px;
-  border-bottom: 1px dashed #d1d5db;
-}
+.rcpt-item { margin-bottom: 9px; padding-bottom: 4px; border-bottom: 1px dashed #d1d5db; }
 .rcpt-item:last-child { border-bottom: none; }
-.rcpt-item-top {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-}
+.rcpt-item-top { display: table; width: 100%; table-layout: fixed; }
 .rcpt-item-top > span { display: table-cell; vertical-align: top; }
 .rcpt-item-top > span:last-child { text-align: right; white-space: nowrap; }
 .rcpt-item-name { font-weight: 800; word-break: break-word; padding-right: 6px; }
 .rcpt-item-total { font-weight: 900; white-space: nowrap; }
 .rcpt-item-sub { color: #111827; font-size: 12px; margin-top: 2px; font-weight: 800; }
-.rcpt-total-row {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-  font-weight: 900;
-  font-size: 16px;
-}
+.rcpt-pl-3 { padding-left: 12px; }
+.rcpt-addon-row { margin-top: 3px; padding-bottom: 2px; border-bottom: 1px dotted #e5e7eb; }
+.rcpt-addon-row:last-child { border-bottom: none; }
+.rcpt-total-row { display: table; width: 100%; table-layout: fixed; font-weight: 900; font-size: 16px; }
 .rcpt-total-row > span { display: table-cell; vertical-align: top; }
 .rcpt-total-row > span:last-child { text-align: right; white-space: nowrap; }
 .rcpt-section { margin: 8px 0; }
 .rcpt-meta-block { margin-bottom: 6px; }
 .rcpt-gift { font-size: 10px; font-weight: 800; }
 .rcpt-free { font-weight: 900; }
-.rcpt-pay-block {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed #9ca3af;
-}
+.rcpt-pay-block { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #9ca3af; }
 
-/* Kitchen chit - ALL SIZES INCREASED */
 .chit { font-family: 'Courier New', Courier, monospace; color: #111827; width: 100%; }
 .chit-title { text-align: center; font-size: 28px; font-weight: 900; letter-spacing: 0.8px; }
 .chit-type { text-align: center; font-size: 18px; font-weight: 900; text-transform: uppercase; margin-top: 3px; }
 .chit-table { text-align: center; margin-top: 7px; }
-.chit-meta {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-  font-weight: 900;
-  font-size: 16px;
-}
+.chit-meta { display: table; width: 100%; table-layout: fixed; font-weight: 900; font-size: 16px; }
 .chit-meta > span { display: table-cell; vertical-align: top; }
 .chit-meta > span:last-child { text-align: right; white-space: nowrap; }
 .chit-name { font-weight: 900; margin-top: 5px; font-size: 16px; }
 .chit-items { margin: 10px 0; }
-.chit-item {
-  display: table;
-  width: 100%;
-  table-layout: fixed;
-  margin-bottom: 12px;
-}
+.chit-item { display: table; width: 100%; table-layout: fixed; margin-bottom: 12px; }
 .chit-qty, .chit-item-name { display: table-cell; vertical-align: top; }
 .chit-qty { font-size: 24px; font-weight: 900; line-height: 1; width: 45px; white-space: nowrap; }
 .chit-item-name { font-size: 18px; font-weight: 900; line-height: 1.3; word-break: break-word; }
 `.trim();
 
-/**
- * Thermal-printer overrides — injected only in the print popup.
- * Thermal heads need pure black, bold strokes, no grayscale or font smoothing.
- */
 export const RECEIPT_THERMAL_PRINT_CSS = `
-html, body, .rcpt, .chit, .rcpt *, .chit * {
-  color: #000 !important;
-  -webkit-font-smoothing: none !important;
-  -moz-osx-font-smoothing: auto !important;
-  text-rendering: geometricPrecision;
-}
-.rcpt, .chit {
-  font-family: 'Courier New', Courier, monospace !important;
-  font-size: 14px !important;
-  line-height: 1.42 !important;
-  font-weight: 900 !important;
-}
-.rcpt-muted, .rcpt-item-sub, .rcpt-gift, .rcpt-free {
-  color: #000 !important;
-  font-weight: 900 !important;
-}
-/* Ensure labels stay small even on physical print */
-.rcpt-label {
-  font-size: 12px !important;
-  color: #000 !important;
-  font-weight: 900 !important;
-}
+html, body, .rcpt, .chit, .rcpt *, .chit * { color: #000 !important; -webkit-font-smoothing: none !important; -moz-osx-font-smoothing: auto !important; text-rendering: geometricPrecision; }
+.rcpt, .chit { font-family: 'Courier New', Courier, monospace !important; font-size: 14px !important; line-height: 1.42 !important; font-weight: 900 !important; }
+.rcpt-muted, .rcpt-item-sub, .rcpt-gift, .rcpt-free { color: #000 !important; font-weight: 900 !important; }
+.rcpt-label { font-size: 12px !important; color: #000 !important; font-weight: 900 !important; }
 .rcpt-name { font-size: 20px !important; font-weight: 900 !important; }
 .rcpt-title { font-size: 14px !important; font-weight: 900 !important; }
 .rcpt-thanks { font-size: 14px !important; font-weight: 900 !important; }
 .rcpt-sm { font-size: 13px !important; }
-.rcpt-xs { font-size: 11px !important; } /* <-- Decreased from 12px to 11px for better fit */
+.rcpt-xs { font-size: 11px !important; }
 .rcpt-item-sub { font-size: 12px !important; }
 .rcpt-total-row { font-size: 17px !important; }
 .rcpt-hr { border-top: 1.5px solid #000 !important; margin: 6px 0 !important; }
 .rcpt-hr-solid { border-top: 3px solid #000 !important; margin: 6px 0 !important; }
-.rcpt-badge {
-  background: #000 !important;
-  color: #fff !important;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-/* Kitchen chit thermal print overrides - BIGGER FONTS */
+.rcpt-badge { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .chit-title { font-size: 32px !important; }
 .chit-type { font-size: 20px !important; }
 .chit-meta { font-size: 18px !important; }
@@ -243,16 +150,35 @@ html, body, .rcpt, .chit, .rcpt *, .chit * {
 export function buildCustomerReceiptHTML(order: NewOrderData): string {
   const itemsHTML = order.items
     .map((oi) => {
-      const lineTotal = oi.isGift ? 0 : oi.menuItem.price * oi.quantity;
+      // 1. Separate the base calculation
+      const baseLineTotal = oi.isGift ? 0 : oi.menuItem.price * oi.quantity;
       const giftTag = oi.isGift ? ' <span class="rcpt-gift">[GIFT]</span>' : '';
-      return `
+
+      let html = `
       <div class="rcpt-item">
         <div class="rcpt-item-top">
           <span class="rcpt-item-name">${esc(oi.menuItem.name)}${giftTag}</span>
-          <span class="rcpt-item-total ${oi.isGift ? 'rcpt-free' : ''}">${oi.isGift ? 'FREE' : esc(money(lineTotal))}</span>
+          <span class="rcpt-item-total ${oi.isGift ? 'rcpt-free' : ''}">${oi.isGift ? 'FREE' : esc(money(baseLineTotal))}</span>
         </div>
-        <div class="rcpt-item-sub">${oi.quantity} x ${oi.isGift ? esc(money(oi.menuItem.price)) + ' (complimentary)' : esc(money(oi.menuItem.price))}</div>
-      </div>`;
+        <div class="rcpt-item-sub">${oi.quantity} x ${oi.isGift ? esc(money(oi.menuItem.price)) + ' (complimentary)' : esc(money(oi.menuItem.price))}</div>`;
+
+      // 2. Map and print out each add-on as its own distinct row for clear math
+      if (oi.addons && oi.addons.length > 0) {
+        oi.addons.forEach((a) => {
+          const addonLineTotal = oi.isGift ? 0 : a.price * oi.quantity;
+          html += `
+          <div class="rcpt-addon-row">
+            <div class="rcpt-item-top">
+              <span class="rcpt-item-name rcpt-pl-3">+ ${esc(a.name)}</span>
+              <span class="rcpt-item-total">${oi.isGift ? 'FREE' : esc(money(addonLineTotal))}</span>
+            </div>
+            <div class="rcpt-item-sub rcpt-pl-3">${oi.quantity} x ${oi.isGift ? esc(money(a.price)) + ' (complimentary)' : esc(money(a.price))}</div>
+          </div>`;
+        });
+      }
+
+      html += `</div>`;
+      return html;
     })
     .join('');
 
@@ -312,7 +238,6 @@ export function buildCustomerReceiptHTML(order: NewOrderData): string {
 <div class="rcpt">
   <div class="rcpt-center rcpt-section">
     <div class="rcpt-name">${esc(RECEIPT_BRAND.name)}</div>
-    <!-- Changed these 3 lines from rcpt-sm to rcpt-xs to fit the address nicely -->
     <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.tagline)}</div>
     <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.address)}</div>
     <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.phone)}</div>
@@ -344,11 +269,23 @@ export function buildKitchenChitHTML(order: NewOrderData): string {
   const itemsHTML = order.items
     .map((oi) => {
       const giftTag = oi.isGift ? ' <span class="rcpt-gift">[GIFT]</span>' : '';
-      return `
-      <div class="chit-item">
+      let html = `
+      <div class="chit-item" style="margin-bottom: 4px;">
         <span class="chit-qty">${oi.quantity}x</span>
         <span class="chit-item-name">${esc(oi.menuItem.name)}${giftTag}</span>
       </div>`;
+
+      // Display separated for the kitchen so they are visibly parsed
+      if (oi.addons && oi.addons.length > 0) {
+        oi.addons.forEach((a) => {
+          html += `
+          <div class="chit-item" style="margin-top: 2px; margin-bottom: 6px;">
+            <span class="chit-qty"></span>
+            <span class="chit-item-name" style="padding-left: 20px;">+ ${esc(a.name)}</span>
+          </div>`;
+        });
+      }
+      return html;
     })
     .join('');
 
