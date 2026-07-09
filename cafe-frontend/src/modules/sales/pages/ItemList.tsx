@@ -181,7 +181,7 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
             </button>
           </div>
 
-          {/* Actions — kept inside the form so Enter-to-submit still works */}
+          {/* Actions */}
           <div className="flex gap-3 pt-1">
             <button
               type="button"
@@ -232,17 +232,14 @@ function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: Pro
       )}
 
       <div className="p-3 sm:p-3.5">
-        {/* Category */}
         <div className="mb-2">
           <CategoryDot category={item.category} />
         </div>
 
-        {/* Name */}
         <h3 className="text-[13px] sm:text-sm font-bold text-slate-800 leading-snug mb-2.5 sm:mb-3 min-h-[2.25rem] sm:min-h-[2.5rem]">
           {item.name}
         </h3>
 
-        {/* Price + Actions — always visible on touch, hover-reveal on desktop for a cleaner look */}
         <div className="flex items-center justify-between gap-1">
           <span className="text-sm sm:text-base font-bold text-slate-800 shrink-0">
             ৳{item.price}
@@ -380,7 +377,6 @@ export default function ItemList() {
     return counts;
   }, [catalog]);
 
-  // ── Stats ──
   const availableCount = catalog.filter((i) => i.available).length;
   const unavailableCount = catalog.length - availableCount;
   const totalCategories = new Set(catalog.map((i) => i.category)).size;
@@ -429,11 +425,20 @@ export default function ItemList() {
 
   const handleToggle = useCallback(
     async (item: MenuItem) => {
+      // FIX: Optimistic UI updates. We flip the boolean immediately locally,
+      // preventing the UI from waiting on a slow network or jumping around unnecessarily.
+      setCatalog((prev) =>
+        prev.map((i) => (i.id === item.id ? { ...i, available: !i.available } : i))
+      );
+
       try {
         await menuService.toggleAvailability(item.id);
-        await refreshCatalog();
         toast.success(`"${item.name}" marked as ${item.available ? 'unavailable' : 'available'}`);
+        // Ensure catalog matches server state perfectly
+        await refreshCatalog();
       } catch {
+        // Rollback optimistic update on error
+        await refreshCatalog();
         toast.error('Failed to update availability');
       }
     },
@@ -442,7 +447,6 @@ export default function ItemList() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* ── Page Header ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Products List</h1>
@@ -475,7 +479,6 @@ export default function ItemList() {
         )}
       </div>
 
-      {/* ── Search Bar ── */}
       <div className="relative">
         <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -494,12 +497,10 @@ export default function ItemList() {
         )}
       </div>
 
-      {/* ── Category Filter Pills — horizontal scroll on mobile, wraps on larger screens ── */}
       <div
         className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: 'none' }}
       >
-        {/* All pill */}
         <button
           onClick={() => setSelectedCategory('All')}
           className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
@@ -533,7 +534,6 @@ export default function ItemList() {
           );
         })}
 
-        {/* Unavailable — virtual filter (red) */}
         <button
           onClick={() => setSelectedCategory('Unavailable')}
           className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
@@ -549,7 +549,6 @@ export default function ItemList() {
         </button>
       </div>
 
-      {/* ── Results count ── */}
       {(searchQuery || selectedCategory !== 'All') && (
         <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 flex-wrap">
           <ListFilter size={14} className="shrink-0" />
@@ -571,7 +570,6 @@ export default function ItemList() {
         </div>
       )}
 
-      {/* ── Product Grid ── */}
       {filtered.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
           {filtered.map((item) => (
@@ -611,7 +609,6 @@ export default function ItemList() {
         </div>
       )}
 
-      {/* ── Modals ── */}
       {showAddModal && <ItemFormModal onSave={handleAdd} onClose={() => setShowAddModal(false)} />}
       {editingItem && (
         <ItemFormModal

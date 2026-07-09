@@ -9,7 +9,6 @@ import type { DiscountType, NewOrderData, OrderItem } from '../types/menuItem.ty
 
 export const NO_TABLE = '— None —';
 
-/** Best instant for receipts/sorting — real order time, with legacy UTC-noon fallback to createdAt. */
 export function resolveOrderTimestamp(tx: Pick<Transaction, 'date' | 'createdAt'>): string {
   const dateMs = new Date(tx.date).getTime();
   if (!tx.createdAt) return new Date(dateMs).toISOString();
@@ -21,7 +20,9 @@ export function resolveOrderTimestamp(tx: Pick<Transaction, 'date' | 'createdAt'
 }
 
 export function lineUnitPrice(item: OrderItem): number {
-  return item.isGift ? 0 : item.menuItem.price;
+  if (item.isGift) return 0;
+  const addonsTotal = item.addons?.reduce((sum, a) => sum + a.price, 0) || 0;
+  return item.menuItem.price + addonsTotal;
 }
 
 export function lineTotal(item: OrderItem): number {
@@ -82,7 +83,7 @@ export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
     params.discountType,
     params.discountValue
   );
-  const isDineIn = params.channel === 'in_store';
+  const needsTable = params.channel === 'in_store' || params.channel === 'takeaway';
   const now = new Date().toISOString();
 
   return {
@@ -90,7 +91,7 @@ export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
     orderNumber: formatOrderNumber(),
     items: params.items,
     customerName: params.customerName.trim(),
-    tableNumber: isDineIn ? params.tableNumber : NO_TABLE,
+    tableNumber: needsTable ? params.tableNumber : NO_TABLE,
     paymentMethod: params.paymentMethod,
     channel: params.channel,
     subtotal,
@@ -133,15 +134,37 @@ export function orderToTransaction(
     category: order.items[0]?.menuItem.category,
     quantity: totalItems,
     discountAmount: order.discount > 0 ? order.discount : undefined,
-    receiptLines: order.items.map((oi) => ({
-      name: oi.isGift ? `${oi.menuItem.name} (Gift)` : oi.menuItem.name,
-      qty: oi.quantity,
-      unitPrice: lineUnitPrice(oi),
-      menuItemId: oi.menuItem.id,
-      isGift: oi.isGift,
-      giftReason: oi.giftReason,
-      originalUnitPrice: oi.isGift ? oi.menuItem.price : undefined,
-    })),
+
+    // Flatten addons here so database sees correct math and separate records
+    receiptLines: order.items.flatMap((oi) => {
+      const lines = [
+        {
+          name: oi.isGift ? `${oi.menuItem.name} (Gift)` : oi.menuItem.name,
+          qty: oi.quantity,
+          unitPrice: oi.isGift ? 0 : oi.menuItem.price,
+          menuItemId: oi.menuItem.id,
+          isGift: oi.isGift,
+          giftReason: oi.giftReason,
+          originalUnitPrice: oi.isGift ? oi.menuItem.price : undefined,
+        },
+      ];
+
+      if (oi.addons && oi.addons.length > 0) {
+        oi.addons.forEach((a) => {
+          lines.push({
+            name: `+ ${a.name}`,
+            qty: oi.quantity,
+            unitPrice: oi.isGift ? 0 : a.price,
+            menuItemId: a.id,
+            isGift: oi.isGift,
+            giftReason: oi.giftReason, // Added to fix TS error
+            originalUnitPrice: oi.isGift ? a.price : undefined,
+          });
+        });
+      }
+
+      return lines;
+    }),
     receiptStatus: status,
     orderNumber: order.orderNumber,
     tableNumber: order.tableNumber !== NO_TABLE ? order.tableNumber : undefined,
@@ -151,7 +174,6 @@ export function orderToTransaction(
   };
 }
 
-/** Map a POS order to the backend `/sales` create payload. */
 export function orderToSalePayload(
   order: NewOrderData,
   status: ReceiptStatus
@@ -183,19 +205,40 @@ export function orderToSalePayload(
     discountType: order.discountType,
     discountValue: order.discountValue,
     tax: order.tax,
-    orderItems: order.items.map((oi) => ({
-      menuItemId: oi.menuItem.id,
-      name: oi.menuItem.name,
-      unitPrice: lineUnitPrice(oi),
-      quantity: oi.quantity,
-      notes: oi.notes,
-      isGift: oi.isGift,
-      giftReason: oi.giftReason,
-    })),
+
+    // Flatten addons here as well to sync up DB perfectly
+    orderItems: order.items.flatMap((oi) => {
+      const items = [
+        {
+          menuItemId: oi.menuItem.id,
+          name: oi.menuItem.name,
+          unitPrice: oi.isGift ? 0 : oi.menuItem.price,
+          quantity: oi.quantity,
+          notes: oi.notes,
+          isGift: oi.isGift,
+          giftReason: oi.giftReason,
+        },
+      ];
+
+      if (oi.addons && oi.addons.length > 0) {
+        oi.addons.forEach((a) => {
+          items.push({
+            menuItemId: a.id,
+            name: `+ ${a.name}`,
+            unitPrice: oi.isGift ? 0 : a.price,
+            quantity: oi.quantity,
+            notes: undefined, // Added to fix TS error
+            isGift: oi.isGift,
+            giftReason: oi.giftReason, // Added to fix TS error
+          });
+        });
+      }
+
+      return items;
+    }),
   };
 }
 
-/** Map a Transaction back to a partial sale update payload. */
 export function transactionToSaleUpdate(
   tx: Transaction,
   payment?: { customerPaid?: number; changeAmount?: number }
@@ -223,7 +266,6 @@ export function transactionToSaleUpdate(
   };
 }
 
-/** Rebuild NewOrderData from a stored pending transaction for payment collection. */
 export function transactionToOrder(tx: Transaction): NewOrderData | null {
   if (!tx.receiptLines?.length || !tx.orderNumber) return null;
 
@@ -238,6 +280,7 @@ export function transactionToOrder(tx: Transaction): NewOrderData | null {
     quantity: line.qty,
     isGift: line.isGift,
     giftReason: line.giftReason,
+    addons: [],
   }));
 
   return {

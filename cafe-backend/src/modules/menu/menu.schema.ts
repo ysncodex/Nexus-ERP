@@ -17,19 +17,30 @@ const menuCategories = [
 export const menuItemCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   category: z.enum(menuCategories),
-  price: z.number().positive('Price must be greater than 0'),
+  price: z.coerce.number().positive('Price must be greater than 0'),
   available: z.boolean().default(true),
   description: z.string().optional(),
 });
 
-export const menuItemUpdateSchema = menuItemCreateSchema.partial();
+// FIX: Explicitly map the update schema WITHOUT .default(true)
+// so Zod doesn't accidentally reset unavailable items back to true on edits.
+export const menuItemUpdateSchema = z.object({
+  name: z.string().min(1, 'Name is required').optional(),
+  category: z.enum(menuCategories).optional(),
+  price: z.coerce.number().positive().optional(),
+  available: z.boolean().optional(),
+  description: z.string().optional(),
+});
 
 export const menuListQuerySchema = z.object({
   category: z.enum(menuCategories).optional(),
-  available: z
-    .enum(['true', 'false'])
-    .optional()
-    .transform((v) => (v === undefined ? undefined : v === 'true')),
+  // FIX: Robustly handles both boolean and string representations
+  // ensuring the New Order page filters unavailable items perfectly.
+  available: z.preprocess((val) => {
+    if (val === 'true' || val === true) return true;
+    if (val === 'false' || val === false) return false;
+    return undefined;
+  }, z.boolean().optional()),
   search: z.string().optional(),
 });
 

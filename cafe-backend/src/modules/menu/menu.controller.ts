@@ -71,6 +71,7 @@ export async function toggleMenuAvailability(req: Request, res: Response) {
   const existing = await prisma.menuItem.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound('Menu item not found');
 
+  // Explicitly flip the DB state safely
   const item = await prisma.menuItem.update({
     where: { id },
     data: { available: !existing.available },

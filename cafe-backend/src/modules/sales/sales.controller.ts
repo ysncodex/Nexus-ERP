@@ -18,6 +18,12 @@ import {
 
 export async function listSales(req: Request, res: Response) {
   const q = salesListQuerySchema.parse(req.query);
+
+  // Optimization Implementation: Limit to 200 items unless explicitly requested to prevent browser UI freezing
+  if (!q.limit && !q.startDate) {
+    q.limit = 200;
+  }
+
   const rows = await listSaleRecords(q);
   res.json(rows.map(serializeSaleTransaction));
 }
