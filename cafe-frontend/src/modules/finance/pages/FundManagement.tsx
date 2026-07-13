@@ -392,6 +392,7 @@ export default function FundManagement() {
           setPasswordModalOpen(false);
         }}
         title={passwordModalTitle}
+        requiredRole="owner"
       />
 
       {/* ── Add Movement Form Panel (Left Col Desktop / Expandable Top Mobile) ── */}

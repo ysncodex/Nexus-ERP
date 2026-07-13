@@ -306,9 +306,14 @@ export default function PosSync() {
 
       case 'delete_tx':
 
-        deleteTransaction(pendingPw.data.id);
+        void deleteTransaction(pendingPw.data.id)
+          .then(() => {
+            toast.success('Sale deleted.');
+          })
+          .catch(() => {
+            toast.error('Failed to delete sale.');
+          });
 
-        toast.success('Sale deleted.');
 
         break;
 
@@ -491,6 +496,8 @@ export default function PosSync() {
         onConfirm={handlePasswordConfirm}
 
         title={passwordTitle}
+
+        requiredRole="owner"
 
       />
 

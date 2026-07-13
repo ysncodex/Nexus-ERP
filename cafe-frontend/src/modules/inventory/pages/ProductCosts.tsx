@@ -35,6 +35,7 @@ import {
   handleError,
   formatCurrency,
   formatDate,
+  getStoredUser,
 } from '@/shared/utils';
 import { ExportDropdown, TRANSACTION_EXPORT_COLUMNS } from '@/shared/export';
 import type { Transaction } from '@/core/types';
@@ -115,14 +116,14 @@ interface SelectWithChevronProps extends React.SelectHTMLAttributes<HTMLSelectEl
 }
 
 const SelectWithChevron = forwardRef<HTMLSelectElement, SelectWithChevronProps>(
-  ({ hasError, children, ...props }, ref) => (
+  ({ hasError, className = '', children, ...props }, ref) => (
     <div className="relative">
       <select
         {...props}
         ref={ref}
-        className={`w-full h-11 pl-3 sm:pl-4 pr-9 bg-slate-50 border ${
+        className={`w-full h-11 pl-3 sm:pl-4 pr-9 border ${
           hasError ? 'border-red-400' : 'border-slate-200'
-        } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm cursor-pointer`}
+        } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm cursor-pointer ${className}`}
       >
         {children}
       </select>
@@ -331,6 +332,8 @@ function MethodBadge({ method }: { method: string }) {
 
 export default function ProductCosts() {
   const canMutate = useCanMutate();
+  const isOwner = getStoredUser()?.role === 'owner'; // Added Owner Check
+
   const {
     stats,
     filteredTransactions,
@@ -370,8 +373,9 @@ export default function ProductCosts() {
   const [showMobileForm, setShowMobileForm] = useState(false);
 
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void | Promise<void>) | null>(null);
   const [passwordModalTitle, setPasswordModalTitle] = useState('');
+  const [passwordModalRole, setPasswordModalRole] = useState<'owner' | 'manager'>('owner');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
@@ -525,9 +529,10 @@ export default function ProductCosts() {
   const handleManagerDelete = useCallback(
     (id: string) => {
       setPasswordModalTitle('Delete Transaction');
-      setPendingAction(() => () => {
+      setPasswordModalRole('owner');
+      setPendingAction(() => async () => {
         try {
-          deleteTransaction(id);
+          await deleteTransaction(id);
           toast.success('Transaction deleted successfully');
         } catch (error) {
           handleError(error, {
@@ -544,6 +549,7 @@ export default function ProductCosts() {
 
   const handleManagerEdit = useCallback((transaction: Transaction) => {
     setPasswordModalTitle('Edit Transaction');
+    setPasswordModalRole('owner');
     setPendingAction(() => () => {
       setEditingTransaction(transaction);
       setEditModalOpen(true);
@@ -664,6 +670,7 @@ export default function ProductCosts() {
         onClose={handlePasswordModalClose}
         onConfirm={handlePasswordModalConfirm}
         title={passwordModalTitle}
+        requiredRole={passwordModalRole}
       />
       <EditTransactionModal
         isOpen={editModalOpen}
@@ -751,14 +758,17 @@ export default function ProductCosts() {
                     Item Name / Description
                   </label>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setManageItemOpen(true)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                      title="Manage item names"
-                    >
-                      <Pencil size={14} />
-                    </button>
+                    {/* Only Owner can edit/delete stored descriptions */}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setManageItemOpen(true)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                        title="Manage item names"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowAddItem(!showAddItem)}
@@ -779,7 +789,12 @@ export default function ProductCosts() {
                   />
                 ) : (
                   <>
-                    <SelectWithChevron id="item" {...register('item')} hasError={!!errors.item}>
+                    <SelectWithChevron
+                      id="item"
+                      {...register('item')}
+                      hasError={!!errors.item}
+                      className="bg-slate-50"
+                    >
                       <option value="">Select or type item name...</option>
                       {productCostItems.map((item) => (
                         <option key={item.id} value={item.name}>
@@ -807,14 +822,17 @@ export default function ProductCosts() {
                     <Users size={12} /> Supplier
                   </label>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setManageSupplierOpen(true)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                      title="Manage suppliers"
-                    >
-                      <Pencil size={14} />
-                    </button>
+                    {/* Only Owner can edit/delete stored suppliers */}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setManageSupplierOpen(true)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                        title="Manage suppliers"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowAddSupplier(!showAddSupplier)}
@@ -844,6 +862,7 @@ export default function ProductCosts() {
                       id="supplier"
                       {...register('supplier')}
                       hasError={!!errors.supplier}
+                      className="bg-slate-50"
                     >
                       <option value="">Select supplier...</option>
                       {suppliers.map((sup) => (
@@ -862,83 +881,88 @@ export default function ProductCosts() {
                 )}
               </div>
 
-              {/* Qty / Unit / Unit Price */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="col-span-1 sm:col-span-1">
-                  <label
-                    htmlFor="quantity"
-                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
-                  >
-                    Qty
-                  </label>
-                  <input
-                    id="quantity"
-                    type="number"
-                    placeholder="0"
-                    {...register('quantity')}
-                    className={`w-full h-11 px-3 sm:px-4 bg-slate-50 border ${
-                      errors.quantity ? 'border-red-400' : 'border-slate-200'
-                    } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm`}
-                  />
-                  <FieldError message={errors.quantity?.message} />
+              {/* Math / Calculation Section Grouping */}
+              <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 space-y-4">
+                {/* Qty / Unit / Unit Price */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="col-span-1 sm:col-span-1">
+                    <label
+                      htmlFor="quantity"
+                      className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                    >
+                      Qty
+                    </label>
+                    <input
+                      id="quantity"
+                      type="number"
+                      step="any"
+                      placeholder="0.00"
+                      {...register('quantity')}
+                      className={`w-full h-11 px-3 sm:px-4 bg-white border ${
+                        errors.quantity ? 'border-red-400' : 'border-slate-200'
+                      } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm`}
+                    />
+                    <FieldError message={errors.quantity?.message} />
+                  </div>
+                  <div className="col-span-1 sm:col-span-1">
+                    <label
+                      htmlFor="unit"
+                      className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                    >
+                      Unit
+                    </label>
+                    <SelectWithChevron id="unit" {...register('unit')} className="bg-white">
+                      {UNIT_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </SelectWithChevron>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label
+                      htmlFor="unitPrice"
+                      className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                    >
+                      Unit Price
+                    </label>
+                    <input
+                      id="unitPrice"
+                      type="number"
+                      step="any"
+                      placeholder="0.00"
+                      {...register('unitPrice')}
+                      className={`w-full h-11 px-3 sm:px-4 bg-white border ${
+                        errors.unitPrice ? 'border-red-400' : 'border-slate-200'
+                      } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm`}
+                    />
+                    <FieldError message={errors.unitPrice?.message} />
+                  </div>
                 </div>
-                <div className="col-span-1 sm:col-span-1">
-                  <label
-                    htmlFor="unit"
-                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
-                  >
-                    Unit
-                  </label>
-                  <SelectWithChevron id="unit" {...register('unit')}>
-                    {UNIT_OPTIONS.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </SelectWithChevron>
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label
-                    htmlFor="unitPrice"
-                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
-                  >
-                    Unit Price
-                  </label>
-                  <input
-                    id="unitPrice"
-                    type="number"
-                    placeholder="0.00"
-                    {...register('unitPrice')}
-                    className={`w-full h-11 px-3 sm:px-4 bg-slate-50 border ${
-                      errors.unitPrice ? 'border-red-400' : 'border-slate-200'
-                    } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm`}
-                  />
-                  <FieldError message={errors.unitPrice?.message} />
-                </div>
-              </div>
 
-              {/* Total Cost */}
-              <div>
-                <label
-                  htmlFor="cost"
-                  className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
-                >
-                  Total Cost
-                </label>
-                <input
-                  id="cost"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  {...register('cost')}
-                  className={`w-full h-11 px-3 sm:px-4 bg-white border ${
-                    errors.cost ? 'border-red-400' : 'border-indigo-300'
-                  } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm`}
-                />
-                <p className="text-[10px] sm:text-[11px] text-slate-500 mt-2 leading-relaxed">
-                  Auto-filled from Qty × Unit Price — or type directly to override.
-                </p>
-                <FieldError message={errors.cost?.message} />
+                {/* Total Cost */}
+                <div>
+                  <label
+                    htmlFor="cost"
+                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                  >
+                    Total Cost
+                  </label>
+                  <input
+                    id="cost"
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    {...register('cost')}
+                    className={`w-full h-11 px-3 sm:px-4 bg-white border ${
+                      errors.cost ? 'border-red-400' : 'border-indigo-300'
+                    } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm`}
+                  />
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-2 leading-relaxed">
+                    Auto-filled from Qty × Unit Price — or type directly to override.
+                  </p>
+                  <FieldError message={errors.cost?.message} />
+                </div>
               </div>
 
               {/* Payment Method + Date */}
@@ -950,7 +974,7 @@ export default function ProductCosts() {
                   >
                     Paid Via
                   </label>
-                  <SelectWithChevron id="method" {...register('method')}>
+                  <SelectWithChevron id="method" {...register('method')} className="bg-slate-50">
                     {PAYMENT_METHODS.map(({ value, label }) => (
                       <option key={value} value={value}>
                         {label}
@@ -1071,7 +1095,7 @@ export default function ProductCosts() {
                             <span className="text-xs sm:text-sm font-semibold text-slate-700 truncate">
                               {item.name}
                             </span>
-                            <span className="text-[9px] sm:text-[10px] text-slate-400 shrink-0 hidden sm:inline-block">
+                            <span className="text-[9px] sm:text-[10px] text-slate-400 shrink-0 hidden sm:inline-block tabular-nums">
                               {item.qty} {item.unit}
                             </span>
                           </div>
@@ -1079,7 +1103,7 @@ export default function ProductCosts() {
                             <span className="text-xs sm:text-sm font-extrabold text-orange-700 tabular-nums">
                               {formatCurrency(item.cost)}
                             </span>
-                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 w-6 sm:w-7 text-right">
+                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 w-6 sm:w-7 text-right tabular-nums">
                               {sharePct}%
                             </span>
                           </div>
@@ -1147,7 +1171,7 @@ export default function ProductCosts() {
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="text-[10px] font-bold text-slate-500 w-6 text-right">
+                            <span className="text-[10px] font-bold text-slate-500 w-6 text-right tabular-nums">
                               {pct}%
                             </span>
                           </div>
@@ -1200,16 +1224,16 @@ export default function ProductCosts() {
                         <td className="px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
                           {item.name}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs text-slate-700 font-bold whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-right text-xs text-slate-700 font-bold whitespace-nowrap tabular-nums">
                           {item.qty}{' '}
                           <span className="text-[10px] text-slate-400 font-normal uppercase ml-0.5">
                             {item.unit}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs sm:text-sm font-extrabold text-orange-600 whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-right text-xs sm:text-sm font-extrabold text-orange-600 whitespace-nowrap tabular-nums">
                           {formatCurrency(item.cost)}
                         </td>
-                        <td className="px-4 sm:px-5 py-2.5 text-right text-[11px] sm:text-xs text-slate-500 whitespace-nowrap">
+                        <td className="px-4 sm:px-5 py-2.5 text-right text-[11px] sm:text-xs text-slate-500 whitespace-nowrap tabular-nums">
                           {(item.cost / (item.qty || 1)).toFixed(1)} / {item.unit}
                         </td>
                       </tr>
@@ -1322,8 +1346,13 @@ export default function ProductCosts() {
             {hasHistoryFilters && (
               <p className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-200/60">
                 Showing{' '}
-                <span className="font-bold text-slate-700">{filteredProductExpenses.length}</span>{' '}
-                of <span className="font-bold text-slate-700">{productExpenses.length}</span>{' '}
+                <span className="font-bold text-slate-700 tabular-nums">
+                  {filteredProductExpenses.length}
+                </span>{' '}
+                of{' '}
+                <span className="font-bold text-slate-700 tabular-nums">
+                  {productExpenses.length}
+                </span>{' '}
                 records
               </p>
             )}
@@ -1352,16 +1381,19 @@ export default function ProductCosts() {
                   <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[13%]">
                     Cost
                   </th>
-                  <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[12%]">
-                    Actions
-                  </th>
+                  {/* Actions Header only renders for Owners */}
+                  {isOwner && (
+                    <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider w-[12%]">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedExpenses.length > 0 ? (
                   paginatedExpenses.map((t) => (
                     <tr key={t.id} className="hover:bg-orange-50/40 transition-colors group">
-                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs font-medium text-slate-600 whitespace-nowrap">
+                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs font-medium text-slate-600 whitespace-nowrap tabular-nums">
                         {formatDate(t.date)}
                       </td>
                       <td className="px-4 sm:px-5 py-3 sm:py-3.5 max-w-[180px]">
@@ -1371,7 +1403,7 @@ export default function ProductCosts() {
                       </td>
                       <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-center">
                         {t.quantity ? (
-                          <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                          <span className="text-xs font-bold text-slate-700 whitespace-nowrap tabular-nums">
                             {t.quantity}{' '}
                             <span className="text-[10px] text-slate-400 font-normal uppercase">
                               {t.unit}
@@ -1398,14 +1430,14 @@ export default function ProductCosts() {
                           -{formatCurrency(t.amount)}
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
-                        {canMutate && (
-                          // Action buttons always visible on touch devices
+                      {/* Edit/Delete Actions only render for Owners */}
+                      {isOwner && (
+                        <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
                           <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               onClick={() => handleManagerEdit(t)}
                               className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                              title="Edit (Manager Only)"
+                              title="Edit (Owner Only)"
                               aria-label={`Edit transaction: ${t.description}`}
                             >
                               <Pencil size={14} />
@@ -1413,19 +1445,20 @@ export default function ProductCosts() {
                             <button
                               onClick={() => handleManagerDelete(t.id)}
                               className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-                              title="Delete (Manager Only)"
+                              title="Delete (Owner Only)"
                               aria-label={`Delete transaction: ${t.description}`}
                             >
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        )}
-                      </td>
+                        </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 sm:py-20 text-center">
+                    {/* Shift colSpan dynamically based on role */}
+                    <td colSpan={isOwner ? 7 : 6} className="px-4 py-16 sm:py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                           <Package size={28} className="text-slate-300" />
@@ -1450,9 +1483,11 @@ export default function ProductCosts() {
           {filteredProductExpenses.length > 0 && (
             <div className="px-4 sm:px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-xs text-slate-500 w-full text-center md:text-left">
-                <span className="font-bold text-slate-700">{filteredProductExpenses.length}</span>{' '}
+                <span className="font-bold text-slate-700 tabular-nums">
+                  {filteredProductExpenses.length}
+                </span>{' '}
                 record{filteredProductExpenses.length !== 1 ? 's' : ''} ·{' '}
-                <span className="font-bold text-orange-600 whitespace-nowrap">
+                <span className="font-bold text-orange-600 whitespace-nowrap tabular-nums">
                   {formatCurrency(filteredHistoryTotal)}
                 </span>{' '}
                 total

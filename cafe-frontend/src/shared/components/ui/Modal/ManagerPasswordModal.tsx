@@ -1,29 +1,31 @@
 import { useState } from 'react';
 import { Lock } from 'lucide-react';
 import type { ManagerPasswordModalProps } from './Modal.types';
-import { validateManagerPassword } from '@/shared/utils';
+import { validateRolePassword } from '@/shared/utils';
 
 /**
  * ManagerPasswordModal Component
- * Requires manager authorization for sensitive operations
+ * Requires owner authorization for sensitive operations by default.
  */
 export function ManagerPasswordModal({ 
   isOpen, 
   onClose, 
   onConfirm, 
-  title 
+  title,
+  requiredRole = 'owner',
 }: ManagerPasswordModalProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const roleLabel = requiredRole === 'owner' ? 'Owner' : 'Manager';
 
   const handleSubmit = () => {
-    if (validateManagerPassword(password)) {
+    if (validateRolePassword(requiredRole, password)) {
       setPassword('');
       setError('');
       onConfirm();
       onClose();
     } else {
-      setError('Incorrect password. Manager authorization required.');
+      setError(`Incorrect password. ${roleLabel} authorization required.`);
     }
   };
 
@@ -44,21 +46,21 @@ export function ManagerPasswordModal({
           </div>
           <div>
             <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-            <p className="text-xs text-slate-500">Manager authorization required</p>
+            <p className="text-xs text-slate-500">{roleLabel} authorization required</p>
           </div>
         </div>
         
         <div className="space-y-4">
           <div>
             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
-              Manager Password
+              {roleLabel} Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              placeholder="Enter manager password"
+              placeholder={`Enter ${roleLabel.toLowerCase()} password`}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
               autoFocus
             />

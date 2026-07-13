@@ -89,6 +89,7 @@ interface PasswordModalState {
   isOpen: boolean;
   title: string;
   action: (() => void) | null;
+  requiredRole: 'owner' | 'manager';
 }
 
 interface EditModalState {
@@ -99,7 +100,7 @@ interface EditModalState {
 type TypeFilterValue = 'all' | 'fixed' | 'variable';
 type MethodFilterValue = 'all' | 'cash' | 'bank' | 'bkash';
 
-const CLOSED_PASSWORD_MODAL: PasswordModalState = { isOpen: false, title: '', action: null };
+const CLOSED_PASSWORD_MODAL: PasswordModalState = { isOpen: false, title: '', action: null, requiredRole: 'owner' };
 const CLOSED_EDIT_MODAL: EditModalState = { isOpen: false, transaction: null };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -383,9 +384,10 @@ export default function DailyExpense() {
       setPasswordModal({
         isOpen: true,
         title: 'Delete Transaction',
-        action: () => {
+        requiredRole: 'owner',
+        action: async () => {
           try {
-            deleteTransaction(id);
+            await deleteTransaction(id);
             toast.success('Expense deleted successfully.');
           } catch (error) {
             handleError(error, {
@@ -404,6 +406,7 @@ export default function DailyExpense() {
     setPasswordModal({
       isOpen: true,
       title: 'Edit Transaction',
+      requiredRole: 'owner',
       action: () => setEditModal({ isOpen: true, transaction }),
     });
   }, []);
@@ -446,6 +449,7 @@ export default function DailyExpense() {
         onClose={handlePasswordClose}
         onConfirm={handlePasswordConfirm}
         title={passwordModal.title}
+        requiredRole={passwordModal.requiredRole}
       />
       <EditTransactionModal
         isOpen={editModal.isOpen}
@@ -838,16 +842,16 @@ export default function DailyExpense() {
                           <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               onClick={() => handleManagerEdit(t)}
-                              aria-label="Edit transaction (Manager Only)"
-                              title="Edit (Manager Only)"
+                              aria-label="Edit transaction (Owner Only)"
+                              title="Edit (Owner Only)"
                               className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                             >
                               <Pencil size={14} />
                             </button>
                             <button
                               onClick={() => handleManagerDelete(t.id)}
-                              aria-label="Delete transaction (Manager Only)"
-                              title="Delete (Manager Only)"
+                              aria-label="Delete transaction (Owner Only)"
+                              title="Delete (Owner Only)"
                               className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                             >
                               <Trash2 size={14} />
