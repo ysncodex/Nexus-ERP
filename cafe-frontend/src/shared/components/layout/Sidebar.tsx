@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Coffee,
@@ -25,7 +25,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { SidebarProps, TabId } from './Layout.types';
-import { getStoredUser, logoutAndClearAllStorage, ROLE_LABELS, ROLE_NAV_GROUP_LABELS } from '@/shared/utils';
+import {
+  getStoredUser,
+  logoutAndClearAllStorage,
+  ROLE_LABELS,
+  ROLE_NAV_GROUP_LABELS,
+  canAccessTab, // Added this import
+} from '@/shared/utils';
 import type { StaticUserRole } from '@/shared/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,7 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
     barColor: 'bg-amber-500',
     items: [
       { id: 'dashboard', to: '/dashboard/overview', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'report',    to: '/dashboard/reports',  label: 'Analytics',  icon: FileBarChart    },
+      { id: 'report', to: '/dashboard/reports', label: 'Analytics', icon: FileBarChart },
     ],
   },
   {
@@ -63,9 +69,14 @@ const NAV_GROUPS: NavGroup[] = [
     accentClass: 'from-emerald-500 to-emerald-600 shadow-emerald-500/30',
     barColor: 'bg-emerald-500',
     items: [
-      { id: 'new_order',     to: '/dashboard/new-order',     label: 'New Order',     icon: UtensilsCrossed  },
-      { id: 'order_history', to: '/dashboard/order-history', label: 'Order History', icon: ClockArrowDown   },
-      { id: 'pos_sync',      to: '/dashboard/pos-sync',      label: 'POS Sync',      icon: MonitorSmartphone},
+      { id: 'new_order', to: '/dashboard/new-order', label: 'New Order', icon: UtensilsCrossed },
+      {
+        id: 'order_history',
+        to: '/dashboard/order-history',
+        label: 'Order History',
+        icon: ClockArrowDown,
+      },
+      { id: 'pos_sync', to: '/dashboard/pos-sync', label: 'POS Sync', icon: MonitorSmartphone },
     ],
   },
   {
@@ -73,7 +84,12 @@ const NAV_GROUPS: NavGroup[] = [
     accentClass: 'from-orange-500 to-orange-600 shadow-orange-500/30',
     barColor: 'bg-orange-500',
     items: [
-      { id: 'product_list', to: '/dashboard/product-list', label: 'Products List', icon: ClipboardList },
+      {
+        id: 'product_list',
+        to: '/dashboard/product-list',
+        label: 'Products List',
+        icon: ClipboardList,
+      },
     ],
   },
   {
@@ -81,10 +97,15 @@ const NAV_GROUPS: NavGroup[] = [
     accentClass: 'from-indigo-500 to-indigo-600 shadow-indigo-500/30',
     barColor: 'bg-indigo-500',
     items: [
-      { id: 'daily_expense', to: '/dashboard/expenses',    label: 'Daily Expenses',  icon: ShoppingBag },
-      { id: 'daily_record',  to: '/dashboard/records',     label: 'All Records',     icon: History     },
-      { id: 'fixed_cost',    to: '/dashboard/fixed-costs', label: 'Fixed Costs',     icon: Building2   },
-      { id: 'fund',          to: '/dashboard/fund',        label: 'Fund Management', icon: Wallet      },
+      {
+        id: 'daily_expense',
+        to: '/dashboard/expenses',
+        label: 'Daily Expenses',
+        icon: ShoppingBag,
+      },
+      { id: 'daily_record', to: '/dashboard/records', label: 'All Records', icon: History },
+      { id: 'fixed_cost', to: '/dashboard/fixed-costs', label: 'Fixed Costs', icon: Building2 },
+      { id: 'fund', to: '/dashboard/fund', label: 'Fund Management', icon: Wallet },
     ],
   },
   {
@@ -93,7 +114,7 @@ const NAV_GROUPS: NavGroup[] = [
     barColor: 'bg-cyan-500',
     items: [
       { id: 'product_cost', to: '/dashboard/product-costs', label: 'Product Costs', icon: Package },
-      { id: 'suppliers',    to: '/dashboard/suppliers',     label: 'Suppliers',     icon: Truck   },
+      { id: 'suppliers', to: '/dashboard/suppliers', label: 'Suppliers', icon: Truck },
     ],
   },
   {
@@ -101,8 +122,8 @@ const NAV_GROUPS: NavGroup[] = [
     accentClass: 'from-violet-500 to-violet-600 shadow-violet-500/30',
     barColor: 'bg-violet-500',
     items: [
-      { id: 'staff_roster', to: '/dashboard/staff-roster', label: 'Staff Roster', icon: Users   },
-      { id: 'payroll',      to: '/dashboard/payroll',      label: 'Payroll',      icon: Banknote},
+      { id: 'staff_roster', to: '/dashboard/staff-roster', label: 'Staff Roster', icon: Users },
+      { id: 'payroll', to: '/dashboard/payroll', label: 'Payroll', icon: Banknote },
     ],
   },
 ];
@@ -181,7 +202,9 @@ function NavItem({
 
       <item.icon
         size={17}
-        className={isActive ? 'text-white shrink-0' : 'shrink-0 transition-colors group-hover:text-white'}
+        className={
+          isActive ? 'text-white shrink-0' : 'shrink-0 transition-colors group-hover:text-white'
+        }
       />
 
       {/* Desktop label */}
@@ -204,13 +227,7 @@ function NavItem({
 
 // ─── Collapse toggle button ───────────────────────────────────────────────────
 
-function CollapseToggle({
-  isCollapsed,
-  onToggle,
-}: {
-  isCollapsed: boolean;
-  onToggle: () => void;
-}) {
+function CollapseToggle({ isCollapsed, onToggle }: { isCollapsed: boolean; onToggle: () => void }) {
   return (
     <div className="hidden md:block border-b border-slate-700/40">
       <button
@@ -225,9 +242,7 @@ function CollapseToggle({
         ) : (
           <>
             <PanelLeftClose size={16} />
-            <span className="text-[11px] font-semibold uppercase tracking-wider">
-              Collapse
-            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Collapse</span>
             <span className="ml-auto text-[10px] text-slate-600 font-mono">⌘\</span>
           </>
         )}
@@ -247,18 +262,46 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate();
   const userRole: StaticUserRole = getStoredUser()?.role ?? 'owner';
-  const allowedGroupLabels = ROLE_NAV_GROUP_LABELS[userRole];
-  const visibleGroups = NAV_GROUPS.filter((group) => allowedGroupLabels.includes(group.label));
 
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(visibleGroups.map((g) => [g.label, true])),
+  // Compute dynamically filtered groups based on role permissions
+  const visibleGroups = useMemo(() => {
+    const allowedGroupLabels = ROLE_NAV_GROUP_LABELS[userRole];
+
+    return NAV_GROUPS.map((group) => {
+      // 1. Check if the entire group is disallowed
+      if (!allowedGroupLabels.includes(group.label)) {
+        return null;
+      }
+
+      // 2. Filter individual items inside the group
+      const allowedItems = group.items.filter((item) => canAccessTab(userRole, item.id));
+
+      // 3. Hide the group completely if all items inside are restricted
+      if (allowedItems.length === 0) {
+        return null;
+      }
+
+      // 4. Return the group with only the allowed items
+      return {
+        ...group,
+        items: allowedItems,
+      };
+    }).filter(Boolean) as NavGroup[];
+  }, [userRole]);
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(visibleGroups.map((g) => [g.label, true]))
   );
 
   const toggleGroup = (label: string) =>
     setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   const handleLogout = () => {
-    try { logoutAndClearAllStorage(); } catch { /* ignore */ }
+    try {
+      logoutAndClearAllStorage();
+    } catch {
+      /* ignore */
+    }
     navigate('/');
   };
 
@@ -280,8 +323,10 @@ export function Sidebar({
           ${isCollapsed ? 'md:flex-col md:gap-0 md:py-3 md:px-0 p-4' : 'gap-3 px-4 py-3.5'}`}
       >
         {/* Logo */}
-        <div className={`shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl shadow-lg shadow-amber-500/20
-          ${isCollapsed ? 'md:p-2' : 'p-2'}`}>
+        <div
+          className={`shrink-0 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl shadow-lg shadow-amber-500/20
+          ${isCollapsed ? 'md:p-2' : 'p-2'}`}
+        >
           <Coffee className="text-white" size={17} strokeWidth={2.5} />
         </div>
 
@@ -302,7 +347,9 @@ export function Sidebar({
         <div className="md:hidden min-w-0 flex-1">
           <p className="text-[15px] font-black text-white leading-tight tracking-tight">Café ERP</p>
           <p className="text-[10px] text-slate-500 font-medium mt-0.5">V2.6 · Beans &amp; Butter</p>
-          <p className="text-[10px] text-amber-400/90 font-semibold mt-0.5">{ROLE_LABELS[userRole]}</p>
+          <p className="text-[10px] text-amber-400/90 font-semibold mt-0.5">
+            {ROLE_LABELS[userRole]}
+          </p>
         </div>
 
         {/* Mobile close */}

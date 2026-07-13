@@ -27,7 +27,12 @@ import {
   Pagination,
 } from '@/shared/components/ui';
 import { useClientPagination, useCanMutate } from '@/shared/hooks';
-import { fixedCostSchema, type FixedCostFormData, handleError } from '@/shared/utils';
+import {
+  fixedCostSchema,
+  type FixedCostFormData,
+  handleError,
+  getStoredUser,
+} from '@/shared/utils';
 import { ExportDropdown, TRANSACTION_EXPORT_COLUMNS } from '@/shared/export';
 import type { Transaction } from '@/core/types';
 import RangeCalendar from '@/shared/components/ui/Calendar/CustomCalendar';
@@ -42,6 +47,14 @@ function todayISO() {
 function parseLocalDate(isoDate: string): Date {
   const [year, month, day] = isoDate.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+// Ensure strict fraction formatting for ERP consistency
+function formatCurrency(amount: number): string {
+  return amount.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -133,8 +146,10 @@ function MethodBadge({ method }: { method: string }) {
 
 export default function FixedCosts() {
   const canMutate = useCanMutate();
+  const isOwner = getStoredUser()?.role === 'owner'; // Added Owner Check
+
   const {
-    stats,
+    stats, // Restored global stats
     filteredTransactions,
     addTransaction,
     deleteTransaction,
@@ -157,10 +172,11 @@ export default function FixedCosts() {
   // Mobile Form Toggle State
   const [showMobileForm, setShowMobileForm] = useState(false);
 
-  // Manager Password Modal
+  // Owner Password Modal
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [pendingAction, setPendingAction] = useState<(() => void | Promise<void>) | null>(null);
   const [passwordModalTitle, setPasswordModalTitle] = useState('');
+  const [passwordModalRole, setPasswordModalRole] = useState<'owner' | 'manager'>('owner');
 
   // Edit Transaction Modal
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -193,7 +209,7 @@ export default function FixedCosts() {
         addTransaction({
           type: 'expense_fixed',
           category: 'Fixed',
-          amount: Number(data.amount),
+          amount: Number(data.amount), // Restored original backend logic
           method: data.method,
           description: data.description || 'Fixed Cost',
           date: parseLocalDate(costDate),
@@ -202,7 +218,6 @@ export default function FixedCosts() {
         reset();
         setCostDate(todayISO());
 
-        // Auto-close form on mobile after success to show history
         if (window.innerWidth < 1024) setShowMobileForm(false);
       } catch (error) {
         handleError(error, {
@@ -218,9 +233,10 @@ export default function FixedCosts() {
   const handleManagerDelete = useCallback(
     (id: string) => {
       setPasswordModalTitle('Delete Transaction');
-      setPendingAction(() => () => {
+      setPasswordModalRole('owner');
+      setPendingAction(() => async () => {
         try {
-          deleteTransaction(id);
+          await deleteTransaction(id);
           toast.success('Transaction deleted successfully');
         } catch (error) {
           handleError(error, {
@@ -237,6 +253,7 @@ export default function FixedCosts() {
 
   const handleManagerEdit = useCallback((transaction: Transaction) => {
     setPasswordModalTitle('Edit Transaction');
+    setPasswordModalRole('owner');
     setPendingAction(() => () => {
       setEditingTransaction(transaction);
       setEditModalOpen(true);
@@ -311,20 +328,6 @@ export default function FixedCosts() {
     [filteredTransactions]
   );
 
-  const fixedByMethod = useMemo(() => {
-    const b = { cash: 0, bank: 0, bkash: 0 };
-    fixedExpenses.forEach((t) => {
-      const method = t.method ?? 'cash';
-      if (method in b) b[method as keyof typeof b] += t.amount;
-    });
-    return b;
-  }, [fixedExpenses]);
-
-  const largestEntry = useMemo(
-    () => (fixedExpenses.length > 0 ? Math.max(...fixedExpenses.map((t) => t.amount)) : 0),
-    [fixedExpenses]
-  );
-
   const hasActiveFilters = searchQuery !== '' || methodFilter !== 'all';
 
   const filteredExpenses = useMemo(() => {
@@ -336,16 +339,52 @@ export default function FixedCosts() {
     });
   }, [fixedExpenses, searchQuery, methodFilter]);
 
+  // Total specific to current filters
   const filteredTotal = useMemo(
     () => filteredExpenses.reduce((s, t) => s + t.amount, 0),
     [filteredExpenses]
   );
 
+  // Dynamic Reactive Category Breakdown based on active filters
+  const categoryBreakdown = useMemo(() => {
+    const breakdownMap = new Map<string, number>();
+    filteredExpenses.forEach((t) => {
+      const current = breakdownMap.get(t.description) || 0;
+      breakdownMap.set(t.description, current + t.amount);
+    });
+    return Array.from(breakdownMap.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [filteredExpenses]);
+
+  const fixedByMethod = useMemo(() => {
+    const b = { cash: 0, bank: 0, bkash: 0 };
+    filteredExpenses.forEach((t) => {
+      const method = t.method ?? 'cash';
+      if (method in b) b[method as keyof typeof b] += t.amount;
+    });
+    return b;
+  }, [filteredExpenses]);
+
+  const largestEntry = useMemo(
+    () => (filteredExpenses.length > 0 ? Math.max(...filteredExpenses.map((t) => t.amount)) : 0),
+    [filteredExpenses]
+  );
+
+  // Original Pagination logic preserved
   const { paginatedData: paginatedExpenses, pagination } = useClientPagination(filteredExpenses, {
     initialPageSize: 7,
     pageSizeOptions: [7, 10, 20],
   });
 
+  // New Pagination logic strictly for the Cost Breakdown
+  const { paginatedData: paginatedCategories, pagination: categoryPagination } =
+    useClientPagination(categoryBreakdown, {
+      initialPageSize: 5,
+      pageSizeOptions: [5, 10],
+    });
+
+  // Original Export system perfectly restored
   const exportConfig = useMemo(
     () => ({
       filenameBase: 'fixed_costs',
@@ -371,6 +410,7 @@ export default function FixedCosts() {
         onClose={handleClosePasswordModal}
         onConfirm={handleConfirmPassword}
         title={passwordModalTitle}
+        requiredRole={passwordModalRole}
       />
       <EditTransactionModal
         isOpen={editModalOpen}
@@ -390,9 +430,8 @@ export default function FixedCosts() {
         onDelete={deleteFixedCostItem}
       />
 
-      {/* ── Add Form Panel (Left Col Desktop / Expandable Top Mobile) ── */}
+      {/* ── Add Form Panel ── */}
       <div className="bg-white/90 backdrop-blur p-4 sm:p-5 lg:p-6 rounded-2xl shadow-sm border border-slate-200 h-fit lg:sticky lg:top-28 transition-all">
-        {/* Panel header / Mobile Toggle */}
         <div
           className={`flex items-start justify-between gap-3 cursor-pointer lg:cursor-default ${
             showMobileForm
@@ -422,24 +461,21 @@ export default function FixedCosts() {
                   Period
                 </p>
                 <p className="text-xs sm:text-sm font-extrabold text-purple-700 tabular-nums">
-                  {stats.totalFixedCost.toLocaleString()} ৳
+                  {formatCurrency(stats.totalFixedCost)} ৳
                 </p>
               </div>
             )}
-            {/* Mobile Toggle Caret */}
             <div className="lg:hidden p-2 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center border border-slate-100">
               {showMobileForm ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
           </div>
         </div>
 
-        {/* Form Body - Hidden on Mobile unless Toggled */}
         <div
           className={`lg:block ${showMobileForm ? 'block animate-in slide-in-from-top-2 fade-in duration-200' : 'hidden'}`}
         >
           {canMutate && (
             <form onSubmit={handleFormSubmit(handleSubmit)} className="space-y-4 sm:space-y-5">
-              {/* Description Field */}
               <div>
                 <div className="flex justify-between items-center gap-3 mb-2">
                   <label
@@ -449,18 +485,20 @@ export default function FixedCosts() {
                     Description
                   </label>
                   <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setManageDescriptionOpen(true)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                      aria-label="Manage saved descriptions"
-                    >
-                      <Pencil size={14} />
-                    </button>
+                    {/* Only Owner can edit/delete stored descriptions */}
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setManageDescriptionOpen(true)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowAddItem(!showAddItem)}
-                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
                     >
                       <Plus size={12} /> Add New
                     </button>
@@ -477,64 +515,48 @@ export default function FixedCosts() {
                       onKeyDown={(e) => e.key === 'Enter' && void handleAddItemName()}
                       disabled={addingItem}
                       className="flex-1 h-11 px-4 bg-indigo-50 border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm disabled:opacity-60"
-                      aria-label="New description name"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={() => void handleAddItemName()}
                       disabled={addingItem || !newItemName.trim()}
-                      className="h-11 px-4 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1"
+                      className="h-11 px-4 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
                     >
                       {addingItem ? 'Adding…' : 'Add'}
                     </button>
                     <button
                       type="button"
                       onClick={handleCancelAddItem}
-                      className="h-11 px-3 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-                      aria-label="Cancel adding new description"
+                      className="h-11 px-3 border border-slate-200 rounded-xl text-slate-500 hover:bg-slate-50 transition-colors"
                     >
                       <X size={16} />
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <div className="relative">
-                      <select
-                        id="fixed-description"
-                        {...register('description')}
-                        className={`w-full h-11 pl-4 pr-10 bg-slate-50 border ${
-                          errors.description ? 'border-red-400' : 'border-slate-200'
-                        } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm cursor-pointer`}
-                      >
-                        <option value="">Select description...</option>
-                        {fixedCostItems.map((item) => (
-                          <option key={item.id} value={item.name}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={16}
-                        aria-hidden="true"
-                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"
-                      />
-                    </div>
-                    {fixedCostItems.length === 0 && (
-                      <p className="text-[11px] text-slate-500 mt-2">
-                        No descriptions saved yet — click "Add New".
-                      </p>
-                    )}
-                    {errors.description && (
-                      <p className="text-xs text-red-600 mt-1" role="alert">
-                        {errors.description.message}
-                      </p>
-                    )}
-                  </>
+                  <div className="relative">
+                    <select
+                      id="fixed-description"
+                      {...register('description')}
+                      className={`w-full h-11 pl-4 pr-10 bg-slate-50 border ${
+                        errors.description ? 'border-red-400' : 'border-slate-200'
+                      } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm cursor-pointer`}
+                    >
+                      <option value="">Select description...</option>
+                      {fixedCostItems.map((item) => (
+                        <option key={item.id} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"
+                    />
+                  </div>
                 )}
               </div>
 
-              {/* Amount Field */}
               <div>
                 <label
                   htmlFor="fixed-amount"
@@ -547,7 +569,7 @@ export default function FixedCosts() {
                   type="number"
                   placeholder="0.00"
                   min="0"
-                  step="0.01"
+                  step="0.01" // Preserved step strictly for forms allowing decimals
                   {...register('amount')}
                   className={`w-full h-11 px-4 bg-slate-50 border ${
                     errors.amount ? 'border-red-400' : 'border-slate-200'
@@ -560,7 +582,6 @@ export default function FixedCosts() {
                 )}
               </div>
 
-              {/* Payment Method + Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label
@@ -581,7 +602,6 @@ export default function FixedCosts() {
                     </select>
                     <ChevronDown
                       size={16}
-                      aria-hidden="true"
                       className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 z-10"
                     />
                   </div>
@@ -607,7 +627,7 @@ export default function FixedCosts() {
               <ButtonLoading
                 loading={isSubmitting}
                 type="submit"
-                className="w-full min-h-[48px] px-4 py-3.5 text-white rounded-xl font-bold shadow-md shadow-purple-200 mt-2 bg-purple-600 hover:bg-purple-700 flex items-center justify-center whitespace-nowrap transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2"
+                className="w-full min-h-[48px] px-4 py-3.5 text-white rounded-xl font-bold shadow-md shadow-purple-200 mt-2 bg-purple-600 hover:bg-purple-700 flex items-center justify-center whitespace-nowrap transition-transform active:scale-[0.99]"
               >
                 Save Cost
               </ButtonLoading>
@@ -620,7 +640,6 @@ export default function FixedCosts() {
       <div className="lg:col-span-2 space-y-4 sm:space-y-5">
         {/* ── Summary Card ─────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Summary header */}
           <div className="p-4 md:p-6 bg-gradient-to-r from-purple-50 via-white to-slate-50 border-b border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-5">
               <div className="flex items-center gap-3">
@@ -641,12 +660,11 @@ export default function FixedCosts() {
                   Total
                 </p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums">
-                  {stats.totalFixedCost.toLocaleString()} ৳
+                  {formatCurrency(stats.totalFixedCost)} ৳
                 </p>
               </div>
             </div>
 
-            {/* Mini stats row */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
               <MiniStat
                 label="Entries"
@@ -657,7 +675,7 @@ export default function FixedCosts() {
               />
               <MiniStat
                 label="Categories"
-                value={stats.topFixed.length.toString()}
+                value={categoryBreakdown.length.toString()}
                 icon={Layers}
                 iconColor="text-indigo-600"
                 iconBg="bg-indigo-100"
@@ -665,7 +683,7 @@ export default function FixedCosts() {
               <div className="col-span-2 sm:col-span-1">
                 <MiniStat
                   label="Largest Entry"
-                  value={`${largestEntry.toLocaleString()} ৳`}
+                  value={`${formatCurrency(largestEntry)} ৳`}
                   icon={Building2}
                   iconColor="text-rose-500"
                   iconBg="bg-rose-50"
@@ -676,18 +694,17 @@ export default function FixedCosts() {
           </div>
 
           <div className="p-4 md:p-6 space-y-5">
-            {/* Category breakdown */}
-            {stats.topFixed.length > 0 ? (
+            {/* Category breakdown (Dynamic + Paginated) */}
+            {categoryBreakdown.length > 0 ? (
               <div>
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
                   By Category
                 </h4>
                 <div className="space-y-3">
-                  {stats.topFixed.map((item) => {
+                  {paginatedCategories.map((item) => {
+                    // Calculate percentage based strictly on the filtered total matching the visual rows
                     const pct =
-                      stats.totalFixedCost > 0
-                        ? Math.round((item.amount / stats.totalFixedCost) * 100)
-                        : 0;
+                      filteredTotal > 0 ? Math.round((item.amount / filteredTotal) * 100) : 0;
                     return (
                       <div key={item.name}>
                         <div className="flex items-center justify-between mb-1.5">
@@ -699,7 +716,7 @@ export default function FixedCosts() {
                           </div>
                           <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
                             <span className="text-xs sm:text-sm font-extrabold text-purple-700 tabular-nums">
-                              {item.amount.toLocaleString()} ৳
+                              {formatCurrency(item.amount)} ৳
                             </span>
                             <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 w-8 text-right">
                               {pct}%
@@ -716,6 +733,12 @@ export default function FixedCosts() {
                     );
                   })}
                 </div>
+                {/* Embedded pagination solely for the breakdown container */}
+                {categoryBreakdown.length > 5 && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <Pagination pagination={categoryPagination} showPageInfo={false} />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-6 text-center text-slate-400 text-sm">
@@ -724,7 +747,7 @@ export default function FixedCosts() {
             )}
 
             {/* Payment method split */}
-            {fixedExpenses.length > 0 && (
+            {filteredExpenses.length > 0 && (
               <>
                 <div className="border-t border-slate-100" />
                 <div>
@@ -737,10 +760,7 @@ export default function FixedCosts() {
                     ).map(([key, cfg]) => {
                       const amount = fixedByMethod[key as keyof typeof fixedByMethod];
                       const pct =
-                        stats.totalFixedCost > 0
-                          ? Math.round((amount / stats.totalFixedCost) * 100)
-                          : 0;
-                      const Icon = cfg.icon;
+                        filteredTotal > 0 ? Math.round((amount / filteredTotal) * 100) : 0;
                       return (
                         <div
                           key={key}
@@ -748,16 +768,16 @@ export default function FixedCosts() {
                         >
                           <div className="flex items-center justify-between sm:justify-start gap-2">
                             <div className="flex items-center gap-2">
-                              <Icon size={14} className={cfg.color} />
+                              <cfg.icon size={14} className={cfg.color} />
                               <span className={`text-xs font-bold ${cfg.color}`}>{cfg.label}</span>
                             </div>
                             <span className="sm:hidden text-sm font-extrabold text-slate-800 tabular-nums">
-                              {amount.toLocaleString()} ৳
+                              {formatCurrency(amount)} ৳
                             </span>
                           </div>
 
                           <p className="hidden sm:block text-base font-extrabold text-slate-800 tabular-nums mt-1">
-                            {amount.toLocaleString()} ৳
+                            {formatCurrency(amount)} ৳
                           </p>
 
                           <div className="flex items-center gap-2 mt-1 sm:mt-0">
@@ -789,7 +809,6 @@ export default function FixedCosts() {
 
         {/* ── History Log ──────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Table header with date filter */}
           <div className="px-4 md:px-6 py-4 bg-slate-50/60 border-b border-slate-200">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <div>
@@ -807,7 +826,7 @@ export default function FixedCosts() {
               </div>
             </div>
 
-            {/* Filter bar - Refactored for Mobile */}
+            {/* Filter bar - Exactly matching your original structure */}
             <div className="flex flex-col space-y-3">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 {/* Search */}
@@ -834,7 +853,7 @@ export default function FixedCosts() {
                   )}
                 </div>
 
-                {/* Actions (Clear + Export) */}
+                {/* Actions (Clear + Export) preserved exactly as requested */}
                 <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                   {hasActiveFilters && (
                     <button
@@ -906,9 +925,12 @@ export default function FixedCosts() {
                   <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     Cost
                   </th>
-                  <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  {/* Actions Header only renders for Owners */}
+                  {isOwner && (
+                    <th className="px-4 sm:px-5 py-3.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -932,34 +954,34 @@ export default function FixedCosts() {
                       </td>
                       <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
                         <span className="text-sm font-extrabold text-purple-700 tabular-nums whitespace-nowrap">
-                          -{t.amount.toLocaleString()} ৳
+                          -{formatCurrency(t.amount)} ৳
                         </span>
                       </td>
-                      <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
-                        {canMutate && (
+                      {/* Edit/Delete Actions only render for Owners */}
+                      {isOwner && (
+                        <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
                           <div className="flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity justify-end">
                             <button
                               onClick={() => handleManagerEdit(t)}
-                              className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                              aria-label={`Edit transaction: ${t.description}`}
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors"
                             >
                               <Pencil size={14} />
                             </button>
                             <button
                               onClick={() => handleManagerDelete(t.id)}
-                              className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-                              aria-label={`Delete transaction: ${t.description}`}
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-slate-50 lg:bg-transparent rounded-lg transition-colors"
                             >
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        )}
-                      </td>
+                        </td>
+                      )}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-4 py-16 sm:py-20 text-center">
+                    {/* Conditionally shift colSpan if the Actions column is missing */}
+                    <td colSpan={isOwner ? 5 : 4} className="px-4 py-16 sm:py-20 text-center">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                           <Building2 size={28} className="text-slate-300" />
@@ -982,15 +1004,13 @@ export default function FixedCosts() {
             </table>
           </div>
 
-          {/* Footer */}
+          {/* Table Footer with Pagination */}
           {filteredExpenses.length > 0 && (
             <div className="px-4 sm:px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
               <p className="text-xs text-slate-500 w-full text-center md:text-left">
                 <span className="font-bold text-slate-700">{filteredExpenses.length}</span> entr
                 {filteredExpenses.length !== 1 ? 'ies' : 'y'} ·{' '}
-                <span className="font-bold text-purple-700">
-                  {filteredTotal.toLocaleString()} ৳
-                </span>{' '}
+                <span className="font-bold text-purple-700">{formatCurrency(filteredTotal)} ৳</span>{' '}
                 total
               </p>
               <div className="w-full md:w-auto">

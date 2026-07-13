@@ -1,3 +1,4 @@
+import { Prisma } from '../../generated/prisma/client.js';
 import { prisma } from '../../lib/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { parseBusinessDate } from '../../utils/businessDate.js';
@@ -222,11 +223,25 @@ export async function updateExpenseRecord(id: string, data: ExpenseUpdateInput) 
 
 export async function deleteExpenseRecord(id: string) {
   const existing = await prisma.transaction.findUnique({ where: { id } });
-  if (!existing) throw ApiError.notFound('Expense not found');
+  if (!existing || !EXPENSE_TYPES.includes(existing.type as (typeof EXPENSE_TYPES)[number])) {
+    throw ApiError.notFound('Expense not found');
+  }
 
-  await prisma.fixedCostRecord.deleteMany({ where: { transactionId: id } });
-  await prisma.productCostRecord.deleteMany({ where: { transactionId: id } });
-  await prisma.transaction.delete({ where: { id } });
+  try {
+    await prisma.fixedCostRecord.deleteMany({ where: { transactionId: id } });
+    await prisma.productCostRecord.deleteMany({ where: { transactionId: id } });
+    await prisma.transaction.delete({ where: { id } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        throw ApiError.notFound('Expense not found');
+      }
+      if (error.code === 'P2003') {
+        throw ApiError.conflict('Expense cannot be deleted because related records still depend on it');
+      }
+    }
+    throw error;
+  }
 }
 
 export async function listExpenseRecords(query: {

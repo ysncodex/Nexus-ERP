@@ -6,6 +6,7 @@ export interface ManagerPasswordModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
+  requiredRole?: 'owner' | 'manager';
 }
 
 export interface EditTransactionModalProps {

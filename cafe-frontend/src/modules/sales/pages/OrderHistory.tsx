@@ -53,6 +53,7 @@ import { useClientPagination } from '@/shared/hooks';
 import { useCanMutate } from '@/shared/hooks/useCanMutate';
 import { PAGINATION } from '@/shared/utils/constants';
 import { formatCurrency, formatDate, formatTime } from '@/shared/utils/formatters';
+import { getStoredUser } from '@/shared/utils'; // Added import for role check
 import {
   businessDateKey,
   isBusinessDayKeyInRange,
@@ -493,6 +494,7 @@ function DetailDrawer({
   onDelete,
   onReceivePayment,
   canMutate,
+  isOwner, // Added check
 }: {
   tx: Transaction;
   onClose: () => void;
@@ -500,6 +502,7 @@ function DetailDrawer({
   onDelete: () => void;
   onReceivePayment: () => void;
   canMutate: boolean;
+  isOwner: boolean;
 }) {
   const status = statusOf(tx);
   const method = tx.method ? METHOD_CONFIG[tx.method] : null;
@@ -739,7 +742,8 @@ function DetailDrawer({
               </button>
             </div>
           ) : null}
-          {canMutate && (
+          {/* ONLY OWNER CAN EDIT OR DELETE */}
+          {isOwner && (
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={onEdit}
@@ -847,6 +851,8 @@ function SortBtn({
 
 export default function OrderHistory() {
   const canMutate = useCanMutate();
+  const isOwner = getStoredUser()?.role === 'owner'; // Added check
+
   const { itemNames, suppliers } = useERP();
   const supplierNames = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
 
@@ -1515,7 +1521,9 @@ export default function OrderHistory() {
                         >
                           <Eye size={14} />
                         </button>
-                        {canMutate && (
+
+                        {/* ONLY OWNER CAN SEE TABLE EDIT/DELETE BUTTONS */}
+                        {isOwner && (
                           <>
                             <button
                               type="button"
@@ -1563,6 +1571,7 @@ export default function OrderHistory() {
           onDelete={() => requestDelete(viewing)}
           onReceivePayment={() => setPayingOrder(viewing)}
           canMutate={canMutate}
+          isOwner={isOwner} // Passed down to restrict Drawer actions
         />
       )}
 
@@ -1593,6 +1602,7 @@ export default function OrderHistory() {
         }}
         onConfirm={handlePinVerified}
         title="Confirm Delete"
+        requiredRole="owner"
       />
 
       {/* ── Delete confirmation ── */}

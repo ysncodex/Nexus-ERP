@@ -243,7 +243,7 @@ export default function DailyRecord() {
     }
   };
 
-  // ── Manager Password Modal ─────────────────────────────────────────────────
+  // ── Owner Password Modal ───────────────────────────────────────────────────
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [passwordModalTitle, setPasswordModalTitle] = useState('');

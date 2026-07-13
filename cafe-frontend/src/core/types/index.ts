@@ -21,7 +21,7 @@ export interface ERPContextType {
   filteredTransactions: Transaction[];
   /** Adds a transaction and returns the fully-formed record (including generated id). */
   addTransaction: (t: Omit<Transaction, 'id' | 'date'> & { date?: Date }) => Transaction;
-  deleteTransaction: (id: string) => void;
+  deleteTransaction: (id: string) => Promise<void>;
   updateTransaction: (t: Transaction) => void;
   /** Wipes local transaction cache and resets item/supplier lists. Server data is unchanged. */
   clearAllData: () => void;

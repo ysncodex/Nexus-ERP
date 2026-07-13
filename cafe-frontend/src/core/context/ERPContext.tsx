@@ -185,21 +185,21 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     [refreshCatalogs]
   );
 
-  const deleteTransaction = useCallback((id: string) => {
+  const deleteTransaction = useCallback(async (id: string) => {
     if (blockReadOnlyMutation()) return;
 
-    setTransactions((prev) => {
-      const existing = prev.find((t) => t.id === id);
-      if (!existing) return prev;
+    const existing = transactions.find((t) => t.id === id);
+    if (!existing) return;
 
-      void deleteTransactionOnServer(id, existing.type).catch(() => {
-        setTransactions((p) => [existing, ...p.filter((t) => t.id !== id)]);
-        toast.error('Failed to delete transaction');
-      });
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
 
-      return prev.filter((t) => t.id !== id);
-    });
-  }, []);
+    try {
+      await deleteTransactionOnServer(id, existing.type);
+    } catch (error) {
+      setTransactions((prev) => [existing, ...prev.filter((t) => t.id !== id)]);
+      throw error;
+    }
+  }, [transactions]);
 
   const updateTransaction = useCallback((updated: Transaction) => {
     if (blockReadOnlyMutation()) return;

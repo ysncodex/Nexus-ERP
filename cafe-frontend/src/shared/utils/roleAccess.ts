@@ -19,7 +19,8 @@ export const ROLE_HOME_PATH: Record<StaticUserRole, string> = {
 /** Sidebar group labels visible per role. */
 export const ROLE_NAV_GROUP_LABELS: Record<StaticUserRole, readonly string[]> = {
   owner: ['Overview', 'Orders', 'Products', 'Finance', 'Inventory', 'HR & Team'],
-  manager: ['Orders', 'Products'],
+  // Added 'Finance' and 'Inventory' so the Fixed/Product Cost tabs render in the sidebar
+  manager: ['Orders', 'Products', 'Finance', 'Inventory'],
   /** Visitors browse every section; mutations are blocked elsewhere. */
   visitor: ['Overview', 'Orders', 'Products', 'Finance', 'Inventory', 'HR & Team'],
 };
@@ -34,14 +35,14 @@ export const ROLE_LABELS: Record<StaticUserRole, string> = {
 /** Short descriptions shown on the login page and header. */
 export const ROLE_DESCRIPTIONS: Record<StaticUserRole, string> = {
   owner: 'Full access to every module — finance, inventory, HR, and reports.',
-  manager: 'Day-to-day operations — take orders, review history, and manage the menu.',
+  // Slightly updated description to reflect the new cost management permissions
+  manager: 'Day-to-day operations — take orders, manage the menu, and log costs.',
   visitor:
     'Browse the full dashboard in read-only mode — explore every page without changing data.',
 };
 
 /** Toast copy when a visitor attempts a write action. */
-export const READ_ONLY_TOAST =
-  'Read-only preview — sign in as Owner or Manager to save changes.';
+export const READ_ONLY_TOAST = 'Read-only preview — sign in as Owner or Manager to save changes.';
 
 const READ_ONLY_TOAST_ID = 'read-only-blocked';
 
@@ -50,6 +51,8 @@ const MANAGER_PATHS = new Set([
   '/dashboard/order-history',
   '/dashboard/pos-sync',
   '/dashboard/product-list',
+  '/dashboard/fixed-costs', // Added Fixed Costs access
+  '/dashboard/product-costs', // Added Product Costs access
 ]);
 
 /** Normalise a pathname to the section path used for access checks. */
