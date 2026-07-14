@@ -64,13 +64,19 @@ export const authService = {
     return !!localStorage.getItem('authToken');
   },
 
-  // Verify token with backend
+  // Verify token with backend.
+  // Returns `false` ONLY when the backend definitively rejects the token
+  // (401/403). Network errors, timeouts, or cold-start failures return `true`
+  // so a temporary outage never logs the user out — any genuinely invalid
+  // token will still be caught by the 401 handler on subsequent requests.
   verifyToken: async (): Promise<boolean> => {
     try {
       await api.get('/auth/verify');
       return true;
-    } catch {
-      return false;
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) return false;
+      return true;
     }
   },
 };
