@@ -20,22 +20,27 @@ export const useAuth = (): UseAuthReturn => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is already authenticated on mount
+    // Check if user is already authenticated on mount.
+    // Keep the stored session on network/cold-start failures — only clear it
+    // when verifyToken definitively rejects the token (401/403). The axios
+    // interceptor remains the single source of truth for live 401 logouts.
     const checkAuth = async () => {
       try {
         const currentUser = authService.getCurrentUser();
-        if (currentUser) {
-          // Verify token with backend
-          const isValid = await authService.verifyToken();
-          if (isValid) {
-            setUser(currentUser);
-          } else {
-            authService.logout();
-          }
+        if (!currentUser) return;
+
+        const isValid = await authService.verifyToken();
+        if (isValid) {
+          setUser(currentUser);
+        } else {
+          authService.logout();
+          setUser(null);
         }
       } catch (err) {
+        // Transient errors should never wipe a valid local session.
         console.error('Auth check failed:', err);
-        authService.logout();
+        const currentUser = authService.getCurrentUser();
+        if (currentUser) setUser(currentUser);
       } finally {
         setIsLoading(false);
       }

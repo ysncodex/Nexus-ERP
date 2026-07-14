@@ -1,0 +1,36 @@
+name: Keep backend warm
+
+# Free-tier Render services spin down after ~15 min of inactivity, causing a
+# 30–60s cold start on the next request. This scheduled job pings the health
+# endpoint every ~13 min so the instance stays awake during the day.
+#
+# Notes:
+#  - GitHub cron is best-effort and can be delayed a few minutes under load;
+#    13 min keeps us comfortably inside Render's ~15 min idle window.
+#  - Scheduled workflows are paused after 60 days with no repo activity —
+#    re-enable from the Actions tab if that happens.
+#  - Change HEALTH_URL below if the backend URL changes.
+
+on:
+  schedule:
+    - cron: '*/13 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    env:
+      HEALTH_URL: https://nexus-erp-nw6e.onrender.com/api/health
+    steps:
+      - name: Ping health endpoint
+        run: |
+          echo "Pinging $HEALTH_URL"
+          # --retry rides out a cold start; --max-time caps a single attempt.
+          # Never fail the run on a missed ping — this is a best-effort warmer.
+          curl -fsS --retry 5 --retry-delay 15 --retry-connrefused --max-time 90 "$HEALTH_URL" \
+            && echo "" && echo "Backend is awake." \
+            || echo "Ping did not succeed this cycle (will retry next schedule)."
