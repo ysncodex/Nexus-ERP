@@ -610,11 +610,11 @@ export default function NewOrder() {
   const [mobileView, setMobileView] = useState<'menu' | 'cart'>('menu');
   const [currentPage, setCurrentPage] = useState(1);
   const [isDesktopView, setIsDesktopView] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
   );
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1280px)');
+    const mq = window.matchMedia('(min-width: 1024px)');
     const handleChange = (e: MediaQueryListEvent) => setIsDesktopView(e.matches);
     mq.addEventListener('change', handleChange);
     return () => mq.removeEventListener('change', handleChange);
@@ -877,11 +877,11 @@ export default function NewOrder() {
         </div>
       )}
 
-      <div className="flex flex-col xl:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* ── LEFT: Product Browser (60%) ── */}
         <div
-          className={`flex-[3] min-w-0 flex-col gap-3 overflow-hidden min-h-[280px] xl:min-h-0 ${
-            mobileView === 'menu' ? 'flex' : 'hidden xl:flex'
+          className={`flex-[3] min-w-0 flex-col gap-3 overflow-hidden min-h-[280px] lg:min-h-0 ${
+            mobileView === 'menu' ? 'flex' : 'hidden lg:flex'
           }`}
         >
           <div className="shrink-0">
@@ -944,7 +944,7 @@ export default function NewOrder() {
 
           <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
             {filteredCatalog.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2 pb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-2 pb-4">
                 {productsToShow.map((item) => (
                   <OrderProductCard
                     key={item.id}
@@ -989,8 +989,8 @@ export default function NewOrder() {
 
         {/* ── RIGHT: Order Cart (40%) ── */}
         <div
-          className={`w-full xl:flex-[2] xl:min-w-[320px] shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex-col overflow-hidden min-h-[360px] max-h-[70dvh] xl:max-h-none xl:min-h-0 ${
-            mobileView === 'cart' ? 'flex' : 'hidden xl:flex'
+          className={`w-full lg:flex-[2] lg:min-w-[280px] xl:min-w-[320px] shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex-col overflow-hidden min-h-[360px] max-h-[70dvh] lg:max-h-none lg:min-h-0 ${
+            mobileView === 'cart' ? 'flex' : 'hidden lg:flex'
           }`}
         >
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
@@ -998,7 +998,7 @@ export default function NewOrder() {
               <button
                 type="button"
                 onClick={() => setMobileView('menu')}
-                className="xl:hidden -ml-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors"
+                className="lg:hidden -ml-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors"
                 aria-label="Back to menu"
               >
                 <ArrowLeft size={16} />
@@ -1225,7 +1225,7 @@ export default function NewOrder() {
           <button
             type="button"
             onClick={() => setMobileView('cart')}
-            className="xl:hidden fixed bottom-4 left-4 right-4 z-40 flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-4 py-3.5 shadow-2xl shadow-slate-900/30 active:scale-[0.98] transition-transform"
+            className="lg:hidden fixed bottom-4 left-4 right-4 z-40 flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-4 py-3.5 shadow-2xl shadow-slate-900/30 active:scale-[0.98] transition-transform"
           >
             <span className="flex items-center gap-2.5">
               <span className="relative shrink-0">

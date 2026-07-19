@@ -150,7 +150,7 @@ export function PosSyncOfflineQueue({
   readOnly?: boolean;
 }) {
   return (
-    <div className="xl:col-span-5 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden h-full">
+    <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden h-full">
       <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-start gap-3">
         <div className="bg-amber-50 p-2.5 rounded-xl text-amber-700 shrink-0">
           <Layers size={20} />
@@ -234,7 +234,7 @@ export function PosSyncIntegrations({
   readOnly?: boolean;
 }) {
   return (
-    <div className="xl:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-full">
+    <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-full">
       <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center gap-2">
         <Cloud size={18} className="text-indigo-500 shrink-0" />
         <div className="min-w-0">
@@ -244,7 +244,7 @@ export function PosSyncIntegrations({
           </p>
         </div>
       </div>
-      <div className="p-4 sm:p-5 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="p-4 sm:p-5 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {DELIVERY_INTEGRATIONS.map((key) => {
           const ui = INTEGRATION_UI[key];
           const Icon = ui.icon;

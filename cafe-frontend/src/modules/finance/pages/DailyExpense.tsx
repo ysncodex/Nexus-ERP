@@ -488,7 +488,7 @@ export default function DailyExpense() {
           </div>
 
           {/* Stat cards - Grid updated for better mobile layout */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             <MiniStat
               label="Total Expenses"
               value={`${monthlyTotal.toLocaleString()} ৳`}

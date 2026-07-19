@@ -851,7 +851,7 @@ export default function DailyRecord() {
       {/* ── Table ── */}
       <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 hover:scrollbar-thumb-slate-400">
         <table
-          className={`w-full text-left ${canEdit ? 'min-w-[1100px] sm:min-w-[1380px]' : 'min-w-[1000px] sm:min-w-[1280px]'}`}
+          className={`w-full text-left ${canEdit ? 'min-w-[900px] lg:min-w-[1100px] xl:min-w-[1380px]' : 'min-w-[820px] lg:min-w-[1000px] xl:min-w-[1280px]'}`}
         >
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-slate-50 border-b-2 border-slate-200 shadow-sm">

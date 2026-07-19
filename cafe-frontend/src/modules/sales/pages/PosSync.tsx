@@ -389,7 +389,7 @@ export default function PosSync() {
 
 
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4 min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-w-0">
 
         <PosSyncOfflineQueue
 
