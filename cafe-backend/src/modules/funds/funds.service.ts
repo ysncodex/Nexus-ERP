@@ -234,7 +234,16 @@ export async function getCombinedAccountBalances() {
     if (!(method in operational)) continue;
 
     if (group.type === 'sale') {
-      if (group.receiptStatus === 'completed') operational[method] += amount;
+      // `receiptStatus` is only ever explicitly 'pending'/'refunded'/'voided' for
+      // sales that are genuinely not-yet-paid. Historically, quick/manual sale
+      // entries (no orderNumber) were saved with receiptStatus left NULL — the
+      // frontend already treats NULL as a completed sale everywhere (see
+      // isPaidSale), so the balance must match that or the cash/bKash/bank
+      // drawer permanently understates real sales. Only exclude rows explicitly
+      // marked pending/refunded/voided.
+      if (group.receiptStatus === 'completed' || group.receiptStatus === null) {
+        operational[method] += amount;
+      }
     } else if (
       group.type === 'sale_adjustment' ||
       group.type === 'expense_product' ||

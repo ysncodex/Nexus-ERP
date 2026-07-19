@@ -12,6 +12,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:check": "tsx scripts/check-db.ts",
     "db:test-sales": "tsx scripts/test-sales-flows.ts",
+    "db:backfill-receipt-status": "tsx scripts/backfill-receipt-status.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",

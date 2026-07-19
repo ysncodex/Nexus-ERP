@@ -1,8 +1,11 @@
 import { prisma } from '../../lib/prisma.js';
-import { ApiError } from '../../utils/ApiError.js';
+import type { ReceiptStatus } from '../../generated/prisma/client.js';
+  import { ApiError } from '../../utils/ApiError.js';
 import { resolveTransactionDate } from '../../utils/businessDate.js';
 import { dateRangeWhere, paginate } from '../../utils/query.js';
 import type { SaleCreateInput, SaleUpdateInput } from './sales.schema.js';
+
+const EXCLUDED_SALE_STATUSES: ReceiptStatus[] = ['pending', 'refunded', 'voided'];
 
 const SALE_TYPES = ['sale', 'sale_adjustment'] as const;
 
@@ -51,8 +54,15 @@ function buildTransactionData(data: SaleCreateInput) {
     description: data.description ?? '',
     date: resolveTransactionDate(data.date),
     orderNumber: data.orderNumber,
-    receiptStatus:
-      data.receiptStatus ?? (data.orderNumber && !pending ? ('completed' as const) : undefined),
+    // Any sale that isn't explicitly marked "pending" is a completed sale — this
+    // covers quick/manual sale entries (no orderNumber) as well as POS orders.
+    // BUG FIX: this used to require `data.orderNumber` too, so quick sales (Dashboard
+    // "Quick Record Sale", etc.) were stored with `receiptStatus: null`. The frontend
+    // treats null as completed (counts it in revenue/period totals), but the fund
+    // balance aggregation only sums rows where `receiptStatus === 'completed'` — so
+    // those quick sales were silently excluded from the authoritative cash/bank/bkash
+    // balances, understating the drawer vs. the sales figures shown elsewhere.
+    receiptStatus: data.receiptStatus ?? (pending ? undefined : ('completed' as const)),
     posChannel: data.posChannel,
     customerName: data.customerName,
     tableNumber: data.tableNumber,
@@ -250,7 +260,11 @@ export async function deleteSaleRecord(id: string) {
 export async function saleStatsRecords(query: { startDate?: string; endDate?: string }) {
   const where = {
     type: 'sale' as const,
-    receiptStatus: 'completed' as const,
+    // Match `isPaidSale` on the frontend: NULL receiptStatus counts as completed
+    // (legacy quick sales created without an explicit status). `notIn` alone would
+    // silently drop NULL rows too (SQL NOT IN excludes NULLs), so allow them back
+    // in explicitly. Only rows explicitly marked pending/refunded/voided are excluded.
+    OR: [{ receiptStatus: null }, { receiptStatus: { notIn: EXCLUDED_SALE_STATUSES } }],
     ...dateRangeWhere(query.startDate, query.endDate),
   };
 
