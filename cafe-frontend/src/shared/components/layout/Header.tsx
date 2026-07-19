@@ -13,8 +13,9 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
   const getPageTitle = (tab: string) => {
     const titles: Record<string, string> = {
       // Main
-      dashboard:    'Dashboard',
-      daily_record: 'All Records',
+      dashboard:         'Dashboard',
+      manager_dashboard: 'Manager Dashboard',
+      daily_record:      'All Records',
       report:       'Analytics',
       // Operations
       daily_expense: 'Daily Expenses',
@@ -40,8 +41,9 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
     const descriptions: Record<string, string> = {
       // Main
       // Overview
-      dashboard:    'Overview of key financial metrics and recent activities',
-      report:       'Generate comprehensive financial reports and analytics',
+      dashboard:         'Overview of key financial metrics and recent activities',
+      manager_dashboard: "Live shift overview — sales, orders, drawer balances, and quick entry",
+      report:            'Generate comprehensive financial reports and analytics',
       // Finance
       daily_expense: 'Track daily operational expenses',
       daily_record:  'Browse and search all transaction records by date range',
@@ -77,7 +79,7 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
-      <div className="px-4 py-3 md:px-8 md:py-4">
+      <div className="px-4 py-3 md:px-5 md:py-4 lg:px-6 xl:px-8">
         <div className="flex items-center justify-between">
           {/* Left Section: Title and Description */}
           <div className="flex items-center gap-3 flex-1">
@@ -91,14 +93,14 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                <h1 className="text-base sm:text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">
+                <h1 className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold text-slate-900 tracking-tight truncate">
                   {getPageTitle(activeTab)}
                 </h1>
                 <span className={`hidden md:inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full ${roleBadgeClass}`}>
                   {roleLabel ?? 'Active'}
                 </span>
               </div>
-              <p className="text-xs md:text-sm text-slate-500 mt-1 hidden md:block">
+              <p className="text-xs lg:text-sm text-slate-500 mt-1 hidden lg:block">
                 {getPageDescription(activeTab)}
               </p>
             </div>
@@ -106,19 +108,19 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
 
           {/* Right Section: Date and User */}
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden md:flex items-center gap-2 text-sm text-slate-700 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+            <div className="hidden lg:flex items-center gap-2 text-sm text-slate-700 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
               <UserCircle2 size={18} className="text-slate-400" />
               <span className="font-semibold">{userName}</span>
             </div>
-            <div className="hidden md:flex items-center gap-2 text-sm text-slate-600 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+            <div className="hidden lg:flex items-center gap-2 text-sm text-slate-600 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
               <Calendar size={16} className="text-slate-400" />
               <span className="font-medium">{currentDate}</span>
             </div>
           </div>
         </div>
 
-        {/* Mobile Date Display */}
-        <div className="md:hidden mt-2 flex items-center justify-between">
+        {/* Compact date/user row — phones through small laptops (below lg) */}
+        <div className="lg:hidden mt-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Calendar size={14} className="text-slate-400" />
             <span>{currentDate}</span>

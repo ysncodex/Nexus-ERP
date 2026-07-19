@@ -12,15 +12,15 @@ import { getStoredUser, type StaticUserRole } from './staticPassword';
 /** Default landing path after login or when visiting `/dashboard`. */
 export const ROLE_HOME_PATH: Record<StaticUserRole, string> = {
   owner: '/dashboard/overview',
-  manager: '/dashboard/new-order',
+  manager: '/dashboard/manager-overview',
   visitor: '/dashboard/overview',
 };
 
 /** Sidebar group labels visible per role. */
 export const ROLE_NAV_GROUP_LABELS: Record<StaticUserRole, readonly string[]> = {
   owner: ['Overview', 'Orders', 'Products', 'Finance', 'Inventory', 'HR & Team'],
-  // Added 'Finance' and 'Inventory' so the Fixed/Product Cost tabs render in the sidebar
-  manager: ['Orders', 'Products', 'Finance', 'Inventory'],
+  // 'Overview' surfaces the Manager Dashboard; Finance/Inventory expose the cost tabs.
+  manager: ['Overview', 'Orders', 'Products', 'Finance', 'Inventory'],
   /** Visitors browse every section; mutations are blocked elsewhere. */
   visitor: ['Overview', 'Orders', 'Products', 'Finance', 'Inventory', 'HR & Team'],
 };
@@ -47,6 +47,7 @@ export const READ_ONLY_TOAST = 'Read-only preview — sign in as Owner or Manage
 const READ_ONLY_TOAST_ID = 'read-only-blocked';
 
 const MANAGER_PATHS = new Set([
+  '/dashboard/manager-overview', // Manager's dedicated operations dashboard
   '/dashboard/new-order',
   '/dashboard/order-history',
   '/dashboard/pos-sync',
@@ -54,6 +55,9 @@ const MANAGER_PATHS = new Set([
   '/dashboard/fixed-costs', // Added Fixed Costs access
   '/dashboard/product-costs', // Added Product Costs access
 ]);
+
+/** Manager-only sections that owner/visitor should not land on. */
+const MANAGER_ONLY_PATHS = new Set(['/dashboard/manager-overview']);
 
 /** Normalise a pathname to the section path used for access checks. */
 function normalizeDashboardPath(pathname: string): string {
@@ -98,7 +102,7 @@ export function canAccessPath(role: StaticUserRole, pathname: string): boolean {
   switch (role) {
     case 'owner':
     case 'visitor':
-      return path.startsWith('/dashboard/');
+      return path.startsWith('/dashboard/') && !MANAGER_ONLY_PATHS.has(path);
     case 'manager':
       return MANAGER_PATHS.has(path);
     default:
@@ -110,6 +114,7 @@ export function canAccessPath(role: StaticUserRole, pathname: string): boolean {
 export function canAccessTab(role: StaticUserRole, tabId: TabId): boolean {
   const tabToPath: Partial<Record<TabId, string>> = {
     dashboard: '/dashboard/overview',
+    manager_dashboard: '/dashboard/manager-overview',
     report: '/dashboard/reports',
     new_order: '/dashboard/new-order',
     order_history: '/dashboard/order-history',

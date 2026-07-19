@@ -14,6 +14,7 @@ function tabFromPathname(pathname: string): TabId {
     // Overview
     case undefined:
     case 'overview': return 'dashboard';
+    case 'manager-overview': return 'manager_dashboard';
     case 'reports':  return 'report';
     // Finance
     case 'expenses':    return 'daily_expense';
@@ -38,7 +39,11 @@ function tabFromPathname(pathname: string): TabId {
 export function DashboardLayout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Start collapsed on small laptops / tablets (below xl = 1280px) so content
+  // gets maximum width; the user can still expand it manually.
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 1280
+  );
 
   const activeTab = useMemo(() => tabFromPathname(location.pathname), [location.pathname]);
   const user = getStoredUser();
@@ -81,7 +86,7 @@ export function DashboardLayout() {
           onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
         />
 
-        <div className="p-3 sm:p-4 md:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-6 md:space-y-8 pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-20 w-full min-w-0">
+        <div className="p-3 sm:p-4 md:p-5 lg:p-6 xl:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-5 lg:space-y-6 xl:space-y-8 pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-20 w-full min-w-0">
           {showReadOnlyBanner && <ReadOnlyBanner />}
           <Suspense fallback={<PageLoader />}>
             <Outlet />

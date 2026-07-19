@@ -61,6 +61,12 @@ const NAV_GROUPS: NavGroup[] = [
     barColor: 'bg-amber-500',
     items: [
       { id: 'dashboard', to: '/dashboard/overview', label: 'Dashboard', icon: LayoutDashboard },
+      {
+        id: 'manager_dashboard',
+        to: '/dashboard/manager-overview',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+      },
       { id: 'report', to: '/dashboard/reports', label: 'Analytics', icon: FileBarChart },
     ],
   },

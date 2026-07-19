@@ -8,3 +8,4 @@
  */
 
 export { default as Dashboard } from './pages/Dashboard';
+export { default as ManagerDashboard } from './pages/ManagerDashboard';
