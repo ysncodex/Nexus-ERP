@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 
 import { useERP } from '@/core/context/useERP';
+import { useERPActions } from '@/core/context/useERPActions';
 import { ButtonLoading } from '@/shared/components/ui';
 import { saleSchema, type SaleFormData, handleError } from '@/shared/utils';
 import { businessDateKey, todayBusinessKey } from '@/shared/utils/businessDate';
@@ -572,7 +573,7 @@ function ExpandableAccountCard({
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
 
 function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
-  const { addTransaction } = useERP();
+  const { addTransaction } = useERPActions();
   const [isSubmittingToServer, setIsSubmittingToServer] = useState(false);
   const [saleDate, setSaleDate] = useState(todayISO);
   const maxSelectableDate = todayISO();
@@ -967,7 +968,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Main Two-Column Grid ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
         {/* LEFT — Today's Overview */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-fit">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
@@ -1214,7 +1215,7 @@ export default function Dashboard() {
           </span>
         </div>
 
-        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 items-start">
+        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 items-start">
           <ExpandableAccountCard
             accountKey="cash"
             title="Cash Drawer"
@@ -1336,7 +1337,7 @@ export default function Dashboard() {
             </span>
             <div className="flex-1 h-px bg-slate-100" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {insights.map((insight: InsightItem, index: number) => (
               <InsightCard key={index} insight={insight} />
             ))}

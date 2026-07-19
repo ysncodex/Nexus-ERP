@@ -53,6 +53,12 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3')) {
             return 'vendor-recharts';
           }
+          if (id.includes('node_modules/@tanstack')) {
+            return 'vendor-table';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
           // Split PDF stack: html2canvas is large; keeping it separate avoids one 600kB+ chunk.
           if (id.includes('node_modules/html2canvas')) {
             return 'vendor-html2canvas';

@@ -7,10 +7,25 @@ import {
   computeFundNetFlows,
 } from '@/shared/utils/calculations';
 
+/**
+ * Authoritative account balances computed server-side (GET /api/funds/balances).
+ * When supplied, these override the client-derived balances — which is essential
+ * because the client only holds a capped window of the ledger (recent rows), so
+ * summing it would understate true all-time balances for a busy shop.
+ */
+export interface AuthoritativeBalances {
+  cash: number;
+  bank: number;
+  bkash: number;
+  reserve: number;
+  totalLiquidity: number;
+}
+
 export function computeStats(
   transactions: Transaction[],
   filteredTransactions: Transaction[],
   fundMovements: FundMovement[] = [],
+  authoritativeBalances?: AuthoritativeBalances,
 ): ERPStats {
   let totalSales = 0;
   let foodpandaSales = 0;
@@ -29,6 +44,17 @@ export function computeStats(
     filteredTransactions,
     fundMovements,
   );
+
+  // Prefer authoritative server balances for the *balance* figures (the period
+  // sales/expense breakdowns above stay client-derived from the current window).
+  if (authoritativeBalances) {
+    paymentMethods.cash.balance = authoritativeBalances.cash;
+    paymentMethods.bank.balance = authoritativeBalances.bank;
+    paymentMethods.bkash.balance = authoritativeBalances.bkash;
+    paymentMethods.total.balance =
+      authoritativeBalances.cash + authoritativeBalances.bank + authoritativeBalances.bkash;
+  }
+
   const fundFlows = computeFundNetFlows(fundMovements);
   const dailyAvailableCash = calculateDailyAvailableCash(transactions);
 
@@ -40,7 +66,9 @@ export function computeStats(
     else if (t.type === 'expense_product' || t.type === 'expense_fixed') netCashInRange -= val;
   });
 
-  const totalLiquidity = paymentMethods.total.balance;
+  const totalLiquidity = authoritativeBalances
+    ? authoritativeBalances.totalLiquidity
+    : paymentMethods.total.balance;
   const cashInHand = paymentMethods.cash.balance;
 
   filteredTransactions.forEach((t) => {
@@ -108,7 +136,7 @@ export function computeStats(
     cashBalance: paymentMethods.cash.balance,
     bankBalance: paymentMethods.bank.balance,
     bkashBalance: paymentMethods.bkash.balance,
-    reserveBalance: fundFlows.reserve,
+    reserveBalance: authoritativeBalances ? authoritativeBalances.reserve : fundFlows.reserve,
     totalBalance: paymentMethods.total.balance,
     cashSales: paymentMethods.cash.sales,
     bankSales: paymentMethods.bank.sales,

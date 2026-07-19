@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import {
   Search,
   Plus,
@@ -214,7 +214,13 @@ interface ProductCardProps {
   readOnly?: boolean;
 }
 
-function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: ProductCardProps) {
+const ProductCard = memo(function ProductCard({
+  item,
+  onEdit,
+  onDelete,
+  onToggle,
+  readOnly = false,
+}: ProductCardProps) {
   return (
     <div
       className={`bg-white rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
@@ -278,7 +284,7 @@ function ProductCard({ item, onEdit, onDelete, onToggle, readOnly = false }: Pro
       </div>
     </div>
   );
-}
+});
 
 // ─── Delete Confirm Modal ────────────────────────────────────────────────────
 
@@ -571,7 +577,7 @@ export default function ItemList() {
       )}
 
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3">
           {filtered.map((item) => (
             <ProductCard
               key={item.id}
