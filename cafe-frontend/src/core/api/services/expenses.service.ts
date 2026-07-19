@@ -31,6 +31,8 @@ export const expensesService = {
     endDate?: string;
     type?: string;
     category?: string;
+    page?: number;
+    limit?: number;
   }): Promise<Transaction[]> => {
     const rows = await api.get<(Transaction & { date: string })[]>('/expenses', params);
     return rows.map((t) => ({ ...t, date: new Date(t.date) }));

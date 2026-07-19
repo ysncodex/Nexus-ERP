@@ -72,6 +72,8 @@ export const salesService = {
     endDate?: string;
     channel?: string;
     receiptStatus?: ReceiptStatus;
+    page?: number;
+    limit?: number;
   }): Promise<Transaction[]> => {
     const rows = await api.get<(Transaction & { date: string })[]>('/sales', params);
     return rows.map(parseTransaction);
