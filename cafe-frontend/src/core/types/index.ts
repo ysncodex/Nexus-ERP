@@ -53,6 +53,11 @@ export interface ERPContextType {
   /** Re-fetch fund movements from the backend. */
   refreshFundMovements: () => Promise<void>;
 
+  /** Authoritative account balances from the server (null until first load / when offline). */
+  fundBalances: import('./fund.types').FundBalances | null;
+  /** Re-fetch authoritative account balances from the backend. */
+  refreshFundBalances: () => Promise<void>;
+
   // Catalog lists (server-backed)
   fixedCostItems: CatalogItem[];
   productCostItems: CatalogItem[];

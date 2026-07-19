@@ -566,7 +566,6 @@ export default function FixedCosts() {
                 </label>
                 <input
                   id="fixed-amount"
-                  type="number"
                   placeholder="0.00"
                   min="0"
                   step="0.01" // Preserved step strictly for forms allowing decimals

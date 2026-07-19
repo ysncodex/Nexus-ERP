@@ -1,14 +1,18 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/app/layouts/DashboardLayout';
 import { ProtectedProviders } from '@/app/providers/AppProviders';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
 import { ToastProvider } from '@/shared/components/ui';
-import LoginPage from '@/features/auth/Login';
-import TestComponents from '@/pages/TestComponents';
+import { PageLoader } from '@/shared/components/ui/Loading/Skeletons';
+
+// ── Auth / misc (lazy so the 1.9MB-free login chunk stays off the critical path) ─
+const LoginPage = lazy(() => import('@/features/auth/Login'));
+const TestComponents = lazy(() => import('@/pages/TestComponents'));
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 const Dashboard = lazy(() => import('@/modules/dashboard/pages/Dashboard'));
+const ManagerDashboard = lazy(() => import('@/modules/dashboard/pages/ManagerDashboard'));
 
 // ── Finance ───────────────────────────────────────────────────────────────────
 const DailyExpense   = lazy(() => import('@/modules/finance/pages/DailyExpense'));
@@ -37,6 +41,7 @@ export function AppRoutes() {
   return (
     <ErrorBoundary>
       <ToastProvider />
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public */}
         <Route path="/"                 element={<LoginPage />} />
@@ -53,6 +58,7 @@ export function AppRoutes() {
         >
           {/* Dashboard */}
           <Route path="overview" element={<Dashboard />} />
+          <Route path="manager-overview" element={<ManagerDashboard />} />
 
           {/* Finance */}
           <Route path="expenses"      element={<DailyExpense />} />
@@ -81,6 +87,7 @@ export function AppRoutes() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </ErrorBoundary>
   );
 }

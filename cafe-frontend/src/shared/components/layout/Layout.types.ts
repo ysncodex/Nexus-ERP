@@ -13,7 +13,7 @@ export interface SidebarProps {
 
 export type TabId =
   // Main
-  | 'dashboard' | 'daily_record' | 'report'
+  | 'dashboard' | 'manager_dashboard' | 'daily_record' | 'report'
   // Operations
   | 'daily_expense' | 'product_cost' | 'fixed_cost' | 'fund'
   // Revenue

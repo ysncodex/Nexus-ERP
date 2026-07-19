@@ -403,18 +403,20 @@ export default function ProductCosts() {
     },
   });
 
-  // useWatch is React Compiler-safe; watch() cannot be safely memoised
+  // Watch quantity and total cost to auto-calculate unit price
   const quantity = useWatch({ control, name: 'quantity' });
-  const unitPrice = useWatch({ control, name: 'unitPrice' });
+  const cost = useWatch({ control, name: 'cost' });
 
-  // Auto-calculate total cost from qty × unit price
+  // Auto-calculate unit price from total cost ÷ qty
   useEffect(() => {
     const qty = parseFloat(quantity || '0');
-    const price = parseFloat(unitPrice || '0');
-    if (!isNaN(qty) && !isNaN(price) && qty > 0 && price > 0) {
-      setValue('cost', (qty * price).toFixed(2));
+    const totalCost = parseFloat(cost || '0');
+    if (!isNaN(qty) && !isNaN(totalCost) && qty > 0 && totalCost > 0) {
+      setValue('unitPrice', (totalCost / qty).toFixed(2), { shouldValidate: true });
+    } else {
+      setValue('unitPrice', '');
     }
-  }, [quantity, unitPrice, setValue]);
+  }, [quantity, cost, setValue]);
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
@@ -883,6 +885,29 @@ export default function ProductCosts() {
 
               {/* Math / Calculation Section Grouping */}
               <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-100 space-y-4">
+                {/* Total Cost - Moved to top for intuitive entry */}
+                <div>
+                  <label
+                    htmlFor="cost"
+                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                  >
+                    Total Amount Paid (৳)
+                  </label>
+                  <input
+                    id="cost"
+                    step="any"
+                    placeholder="0.00"
+                    {...register('cost')}
+                    className={`w-full h-11 px-3 sm:px-4 bg-white border ${
+                      errors.cost ? 'border-red-400' : 'border-indigo-300'
+                    } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm`}
+                  />
+                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-2 leading-relaxed">
+                    Type the total amount on the receipt. Unit price calculates automatically.
+                  </p>
+                  <FieldError message={errors.cost?.message} />
+                </div>
+
                 {/* Qty / Unit / Unit Price */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="col-span-1 sm:col-span-1">
@@ -894,7 +919,6 @@ export default function ProductCosts() {
                     </label>
                     <input
                       id="quantity"
-                      type="number"
                       step="any"
                       placeholder="0.00"
                       {...register('quantity')}
@@ -922,46 +946,23 @@ export default function ProductCosts() {
                   <div className="col-span-2 sm:col-span-1">
                     <label
                       htmlFor="unitPrice"
-                      className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
+                      className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wide mb-2 block"
                     >
-                      Unit Price
+                      Unit Price (Auto)
                     </label>
                     <input
                       id="unitPrice"
                       type="number"
                       step="any"
                       placeholder="0.00"
+                      readOnly
                       {...register('unitPrice')}
-                      className={`w-full h-11 px-3 sm:px-4 bg-white border ${
-                        errors.unitPrice ? 'border-red-400' : 'border-slate-200'
-                      } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm`}
+                      className={`w-full h-11 px-3 sm:px-4 bg-emerald-50/50 border ${
+                        errors.unitPrice ? 'border-red-400' : 'border-emerald-200'
+                      } rounded-xl outline-none text-emerald-700 font-bold text-sm cursor-not-allowed`}
                     />
                     <FieldError message={errors.unitPrice?.message} />
                   </div>
-                </div>
-
-                {/* Total Cost */}
-                <div>
-                  <label
-                    htmlFor="cost"
-                    className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide mb-2 block"
-                  >
-                    Total Cost
-                  </label>
-                  <input
-                    id="cost"
-                    type="number"
-                    step="any"
-                    placeholder="0.00"
-                    {...register('cost')}
-                    className={`w-full h-11 px-3 sm:px-4 bg-white border ${
-                      errors.cost ? 'border-red-400' : 'border-indigo-300'
-                    } rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-800 text-sm`}
-                  />
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 mt-2 leading-relaxed">
-                    Auto-filled from Qty × Unit Price — or type directly to override.
-                  </p>
-                  <FieldError message={errors.cost?.message} />
                 </div>
               </div>
 

@@ -20,7 +20,6 @@ import {
 } from '@/shared/utils';
 import { authService } from '@/core/api/services';
 import loginBg from '@/assets/img/login.jpg';
-import loginBg2 from '@/assets/img/login2.gif';
 
 const LOGIN_PARTICLES = Array.from({ length: 20 }, (_, id) => ({
   id,
@@ -172,7 +171,7 @@ export default function LoginPage() {
         <div className="shrink-0 md:w-1/2 bg-gradient-to-br from-slate-800 to-black relative flex flex-col items-center justify-center md:items-stretch md:justify-between p-4 sm:p-6 md:p-12 text-white overflow-hidden">
           <div
             className="absolute inset-0 opacity-20 bg-cover bg-center transition-transform duration-700 hover:scale-110"
-            style={{ backgroundImage: `url(${loginBg2})` }}
+            style={{ backgroundImage: `url(${loginBg})` }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
 

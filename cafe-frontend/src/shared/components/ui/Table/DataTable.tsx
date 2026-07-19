@@ -19,7 +19,7 @@ export function DataTableShell({ children }: { children: ReactNode }) {
 
 export function DataTable({
   children,
-  minWidth = 880,
+  minWidth = 760,
 }: {
   children: ReactNode;
   minWidth?: number;

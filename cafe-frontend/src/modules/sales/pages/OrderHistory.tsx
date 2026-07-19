@@ -853,26 +853,24 @@ export default function OrderHistory() {
   const canMutate = useCanMutate();
   const isOwner = getStoredUser()?.role === 'owner'; // Added check
 
-  const { itemNames, suppliers } = useERP();
+  const {
+    itemNames,
+    suppliers,
+    transactions,
+    refreshTransactions,
+    refreshFundBalances,
+    isLoadingTransactions,
+  } = useERP();
   const supplierNames = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
 
-  const [sales, setSales] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-
+  // Reuse the ledger already loaded by ERP context instead of issuing a second
+  // identical full fetch. Edits/deletes below refresh the shared context (ledger
+  // + authoritative balances), so changes show up here and everywhere instantly.
   const refreshSales = useCallback(async () => {
-    try {
-      const rows = await salesService.getAll();
-      setSales(rows);
-    } catch {
-      toast.error('Failed to load orders from server');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshSales();
-  }, [refreshSales]);
+    await refreshTransactions();
+    void refreshFundBalances();
+  }, [refreshTransactions, refreshFundBalances]);
+  const loading = isLoadingTransactions;
 
   // ── Filters ──
   const [search, setSearch] = useState('');
@@ -913,7 +911,7 @@ export default function OrderHistory() {
   const [showFilters, setShowFilters] = useState(false);
 
   // ── Extract sale transactions ──
-  const allSales = useMemo(() => sales.filter((t) => t.type === 'sale'), [sales]);
+  const allSales = useMemo(() => transactions.filter((t) => t.type === 'sale'), [transactions]);
 
   // ── Filtered + sorted ──
   const filtered = useMemo(() => {
@@ -1172,7 +1170,7 @@ export default function OrderHistory() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         <KpiCard
           label="Total Orders"
           value={String(kpis.total)}

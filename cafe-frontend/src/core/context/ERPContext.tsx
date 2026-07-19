@@ -9,6 +9,7 @@ import type {
   CatalogItem,
   Supplier,
   FundMovement,
+  FundBalances,
 } from '@/core/types';
 import { generateId, STORAGE_KEYS, blockReadOnlyMutation, isAuthenticated } from '@/shared/utils';
 import { businessTodayDateRange, todayBusinessKey } from '@/shared/utils/businessDate';
@@ -27,6 +28,7 @@ import {
 import { catalogService, suppliersService, fundsService } from '@/core/api/services';
 
 import { ERPContext } from './ERPContextDef';
+import { ERPActionsContext, type ERPActions } from './ERPActionsContextDef';
 
 /** Drop saved calendar ranges when the business day rolls over (Asia/Dhaka). */
 function syncBusinessDayStorage(): void {
@@ -50,6 +52,7 @@ function loadSavedDateRange(): DateRangeFilter {
 export function ERPProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fundMovements, setFundMovements] = useState<FundMovement[]>([]);
+  const [fundBalances, setFundBalances] = useState<FundBalances | null>(null);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('today');
   const [customStart, setCustomStart] = useState('');
@@ -101,6 +104,22 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Authoritative account balances (server aggregates the full ledger, so these
+  // are correct even though the client only caches a recent window of rows).
+  const refreshFundBalances = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setFundBalances(null);
+      return;
+    }
+
+    try {
+      setFundBalances(await fundsService.getBalances());
+    } catch {
+      // Non-fatal: stats gracefully fall back to client-derived balances.
+      setFundBalances(null);
+    }
+  }, []);
+
   const refreshTransactions = useCallback(async () => {
     if (!isAuthenticated()) {
       setTransactions([]);
@@ -134,7 +153,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     void refreshTransactions();
     void refreshCatalogs();
     void refreshFundMovements();
-  }, [refreshTransactions, refreshCatalogs, refreshFundMovements]);
+    void refreshFundBalances();
+  }, [refreshTransactions, refreshCatalogs, refreshFundMovements, refreshFundBalances]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const filteredTransactions = useMemo(
@@ -142,9 +162,23 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     [transactions, dateRange, customStart, customEnd, customDateRange]
   );
 
+  const authoritativeBalances = useMemo(
+    () =>
+      fundBalances
+        ? {
+            cash: fundBalances.combined.cash,
+            bank: fundBalances.combined.bank,
+            bkash: fundBalances.combined.bkash,
+            reserve: fundBalances.combined.reserve,
+            totalLiquidity: fundBalances.totalLiquidity,
+          }
+        : undefined,
+    [fundBalances]
+  );
+
   const stats = useMemo(
-    () => computeStats(transactions, filteredTransactions, fundMovements),
-    [transactions, filteredTransactions, fundMovements]
+    () => computeStats(transactions, filteredTransactions, fundMovements, authoritativeBalances),
+    [transactions, filteredTransactions, fundMovements, authoritativeBalances]
   );
 
   const dailyRecords = useMemo(
@@ -174,6 +208,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
           if (saved.type === 'expense_fixed' || saved.type === 'expense_product') {
             void refreshCatalogs();
           }
+          void refreshFundBalances();
         })
         .catch(() => {
           setTransactions((prev) => prev.filter((t) => t.id !== optimistic.id));
@@ -182,24 +217,30 @@ export function ERPProvider({ children }: { children: ReactNode }) {
 
       return optimistic;
     },
-    [refreshCatalogs]
+    [refreshCatalogs, refreshFundBalances]
   );
 
   const deleteTransaction = useCallback(async (id: string) => {
     if (blockReadOnlyMutation()) return;
 
-    const existing = transactions.find((t) => t.id === id);
+    // Read the row from the latest state inside the updater so this callback
+    // stays referentially stable (empty deps) and doesn't churn the context value.
+    let existing: Transaction | undefined;
+    setTransactions((prev) => {
+      existing = prev.find((t) => t.id === id);
+      return existing ? prev.filter((t) => t.id !== id) : prev;
+    });
     if (!existing) return;
-
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
 
     try {
       await deleteTransactionOnServer(id, existing.type);
+      void refreshFundBalances();
     } catch (error) {
-      setTransactions((prev) => [existing, ...prev.filter((t) => t.id !== id)]);
+      const restored = existing;
+      setTransactions((prev) => [restored, ...prev.filter((t) => t.id !== id)]);
       throw error;
     }
-  }, [transactions]);
+  }, [refreshFundBalances]);
 
   const updateTransaction = useCallback((updated: Transaction) => {
     if (blockReadOnlyMutation()) return;
@@ -209,6 +250,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       void updateTransactionOnServer(updated)
         .then((saved) => {
           setTransactions((p) => p.map((t) => (t.id === saved.id ? saved : t)));
+          void refreshFundBalances();
         })
         .catch(() => {
           if (previous) {
@@ -218,7 +260,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
         });
       return prev.map((t) => (t.id === updated.id ? updated : t));
     });
-  }, []);
+  }, [refreshFundBalances]);
 
   const clearAllData = useCallback(() => {
     if (blockReadOnlyMutation()) return;
@@ -375,45 +417,150 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     [deleteProductCostItem]
   );
 
-  const value: ERPContextType = {
-    transactions,
-    filteredTransactions,
-    addTransaction,
-    deleteTransaction,
-    updateTransaction,
-    clearAllData,
-    dateRange,
-    setDateRange,
-    customStart,
-    setCustomStart,
-    customEnd,
-    setCustomEnd,
-    customDateRange,
-    setCustomDateRange,
-    stats,
-    dailyRecords,
-    isLoadingTransactions,
-    refreshTransactions,
-    refreshCatalogs,
-    fundMovements,
-    refreshFundMovements,
-    fixedCostItems,
-    productCostItems,
-    suppliers,
-    itemNames,
-    addFixedCostItem,
-    renameFixedCostItem,
-    deleteFixedCostItem,
-    addProductCostItem,
-    renameProductCostItem,
-    deleteProductCostItem,
-    addItemName,
-    renameItemName,
-    deleteItemName,
-    addSupplier,
-    renameSupplier,
-    deleteSupplier,
-  };
+  // Memoize the context value so consumers only re-render when data they use
+  // actually changes — not on every provider render. All callbacks below are
+  // referentially stable (useCallback), so the deps are effectively the state.
+  const value = useMemo<ERPContextType>(
+    () => ({
+      transactions,
+      filteredTransactions,
+      addTransaction,
+      deleteTransaction,
+      updateTransaction,
+      clearAllData,
+      dateRange,
+      setDateRange,
+      customStart,
+      setCustomStart,
+      customEnd,
+      setCustomEnd,
+      customDateRange,
+      setCustomDateRange,
+      stats,
+      dailyRecords,
+      isLoadingTransactions,
+      refreshTransactions,
+      refreshCatalogs,
+      fundMovements,
+      refreshFundMovements,
+      fundBalances,
+      refreshFundBalances,
+      fixedCostItems,
+      productCostItems,
+      suppliers,
+      itemNames,
+      addFixedCostItem,
+      renameFixedCostItem,
+      deleteFixedCostItem,
+      addProductCostItem,
+      renameProductCostItem,
+      deleteProductCostItem,
+      addItemName,
+      renameItemName,
+      deleteItemName,
+      addSupplier,
+      renameSupplier,
+      deleteSupplier,
+    }),
+    [
+      transactions,
+      filteredTransactions,
+      addTransaction,
+      deleteTransaction,
+      updateTransaction,
+      clearAllData,
+      dateRange,
+      setDateRange,
+      customStart,
+      customEnd,
+      customDateRange,
+      setCustomDateRange,
+      stats,
+      dailyRecords,
+      isLoadingTransactions,
+      refreshTransactions,
+      refreshCatalogs,
+      fundMovements,
+      refreshFundMovements,
+      fundBalances,
+      refreshFundBalances,
+      fixedCostItems,
+      productCostItems,
+      suppliers,
+      itemNames,
+      addFixedCostItem,
+      renameFixedCostItem,
+      deleteFixedCostItem,
+      addProductCostItem,
+      renameProductCostItem,
+      deleteProductCostItem,
+      addItemName,
+      renameItemName,
+      deleteItemName,
+      addSupplier,
+      renameSupplier,
+      deleteSupplier,
+    ]
+  );
 
-  return <ERPContext.Provider value={value}>{children}</ERPContext.Provider>;
+  // Stable action-only surface. All entries are referentially stable, so this
+  // value never changes after mount → `useERPActions()` consumers never re-render
+  // on data changes.
+  const actionsValue = useMemo<ERPActions>(
+    () => ({
+      addTransaction,
+      deleteTransaction,
+      updateTransaction,
+      clearAllData,
+      setDateRange,
+      setCustomStart,
+      setCustomEnd,
+      setCustomDateRange,
+      refreshTransactions,
+      refreshCatalogs,
+      refreshFundMovements,
+      refreshFundBalances,
+      addFixedCostItem,
+      renameFixedCostItem,
+      deleteFixedCostItem,
+      addProductCostItem,
+      renameProductCostItem,
+      deleteProductCostItem,
+      addItemName,
+      renameItemName,
+      deleteItemName,
+      addSupplier,
+      renameSupplier,
+      deleteSupplier,
+    }),
+    [
+      addTransaction,
+      deleteTransaction,
+      updateTransaction,
+      clearAllData,
+      setCustomDateRange,
+      refreshTransactions,
+      refreshCatalogs,
+      refreshFundMovements,
+      refreshFundBalances,
+      addFixedCostItem,
+      renameFixedCostItem,
+      deleteFixedCostItem,
+      addProductCostItem,
+      renameProductCostItem,
+      deleteProductCostItem,
+      addItemName,
+      renameItemName,
+      deleteItemName,
+      addSupplier,
+      renameSupplier,
+      deleteSupplier,
+    ]
+  );
+
+  return (
+    <ERPActionsContext.Provider value={actionsValue}>
+      <ERPContext.Provider value={value}>{children}</ERPContext.Provider>
+    </ERPActionsContext.Provider>
+  );
 }
