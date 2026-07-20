@@ -51,8 +51,11 @@ function buildTransactionData(data: SaleCreateInput) {
     description: data.description ?? '',
     date: resolveTransactionDate(data.date),
     orderNumber: data.orderNumber,
-    receiptStatus:
-      data.receiptStatus ?? (data.orderNumber && !pending ? ('completed' as const) : undefined),
+    // Any sale that isn't explicitly "pending" is completed — including Quick Record
+    // Sale entries that have no orderNumber. Previously only POS orders (with
+    // orderNumber) got receiptStatus='completed'; quick sales were saved as NULL
+    // and excluded from /api/funds/balances cash drawer totals.
+    receiptStatus: data.receiptStatus ?? (pending ? undefined : ('completed' as const)),
     posChannel: data.posChannel,
     customerName: data.customerName,
     tableNumber: data.tableNumber,

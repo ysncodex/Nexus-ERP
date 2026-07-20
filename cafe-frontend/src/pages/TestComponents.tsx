@@ -193,8 +193,7 @@ export default function TestComponentsPage() {
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
         transaction={testTransaction}
-        onSave={(updated) => {
-          console.log('Saved:', updated);
+        onSave={() => {
           alert('Transaction updated!');
         }}
         itemNames={['Coffee', 'Tea', 'Pastry']}
