@@ -37,8 +37,9 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     chunkSizeWarningLimit: 500,
-    minify: 'esbuild',
-    target: 'es2020',
+    // Do NOT set minify: 'esbuild' — this project uses rolldown-vite, which
+    // no longer bundles esbuild. Forcing esbuild minify crashes Netlify builds
+    // with: "Cannot find package 'esbuild'". Default minify (oxc) is correct.
     rollupOptions: {
       output: {
         manualChunks(id) {
