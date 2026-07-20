@@ -234,7 +234,11 @@ export async function getCombinedAccountBalances() {
     if (!(method in operational)) continue;
 
     if (group.type === 'sale') {
-      if (group.receiptStatus === 'completed') operational[method] += amount;
+      // Match frontend `isPaidSale`: NULL receiptStatus = completed (legacy quick sales).
+      // Only exclude sales explicitly marked pending/refunded/voided.
+      if (group.receiptStatus === 'completed' || group.receiptStatus === null) {
+        operational[method] += amount;
+      }
     } else if (
       group.type === 'sale_adjustment' ||
       group.type === 'expense_product' ||

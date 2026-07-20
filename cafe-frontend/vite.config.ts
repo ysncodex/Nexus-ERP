@@ -19,24 +19,27 @@ export default defineConfig(({ mode }) => ({
     // so they win over the catch-all '@' entry at the bottom.
     alias: [
       // ── Specific module aliases ──────────────────────────────────────────
-      { find: '@/app',      replacement: path.resolve(__dirname, './src/app') },
-      { find: '@/modules',  replacement: path.resolve(__dirname, './src/modules') },
-      { find: '@/core',     replacement: path.resolve(__dirname, './src/core') },
-      { find: '@/shared',   replacement: path.resolve(__dirname, './src/shared') },
+      { find: '@/app', replacement: path.resolve(__dirname, './src/app') },
+      { find: '@/modules', replacement: path.resolve(__dirname, './src/modules') },
+      { find: '@/core', replacement: path.resolve(__dirname, './src/core') },
+      { find: '@/shared', replacement: path.resolve(__dirname, './src/shared') },
       { find: '@/features', replacement: path.resolve(__dirname, './src/features') },
-      { find: '@/lib',      replacement: path.resolve(__dirname, './src/lib') },
-      { find: '@/assets',   replacement: path.resolve(__dirname, './src/assets') },
+      { find: '@/lib', replacement: path.resolve(__dirname, './src/lib') },
+      { find: '@/assets', replacement: path.resolve(__dirname, './src/assets') },
       // ── Backward-compat (old paths → new locations) ──────────────────────
-      { find: '@/context',  replacement: path.resolve(__dirname, './src/core/context') },
-      { find: '@/hooks',    replacement: path.resolve(__dirname, './src/shared/hooks') },
-      { find: '@/layouts',  replacement: path.resolve(__dirname, './src/app/layouts') },
+      { find: '@/context', replacement: path.resolve(__dirname, './src/core/context') },
+      { find: '@/hooks', replacement: path.resolve(__dirname, './src/shared/hooks') },
+      { find: '@/layouts', replacement: path.resolve(__dirname, './src/app/layouts') },
       { find: '@/services', replacement: path.resolve(__dirname, './src/core/api') },
       // ── Catch-all (must be last) ─────────────────────────────────────────
-      { find: '@',          replacement: path.resolve(__dirname, './src') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
     ],
   },
   build: {
     chunkSizeWarningLimit: 500,
+    // Do NOT set minify: 'esbuild' — this project uses rolldown-vite, which
+    // no longer bundles esbuild. Forcing esbuild minify crashes Netlify builds
+    // with: "Cannot find package 'esbuild'". Default minify (oxc) is correct.
     rollupOptions: {
       output: {
         manualChunks(id) {
