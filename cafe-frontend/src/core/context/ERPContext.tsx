@@ -120,24 +120,28 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const refreshTransactions = useCallback(async () => {
+  const refreshTransactions = useCallback(async (opts?: { silent?: boolean }) => {
     if (!isAuthenticated()) {
       setTransactions([]);
       setIsLoadingTransactions(false);
       return;
     }
 
-    setIsLoadingTransactions(true);
+    if (!opts?.silent) setIsLoadingTransactions(true);
     try {
       const rows = await fetchAllTransactions();
       setTransactions(rows);
+      // Sales/expenses change cash/bank/bKash drawer totals — keep the
+      // authoritative balances in lockstep so Manager Dashboard doesn't
+      // require a full page reload after an order.
+      void refreshFundBalances();
     } catch {
       toast.error('Could not load transactions from server');
       setTransactions([]);
     } finally {
-      setIsLoadingTransactions(false);
+      if (!opts?.silent) setIsLoadingTransactions(false);
     }
-  }, []);
+  }, [refreshFundBalances]);
 
   // Legacy localStorage hook — no longer persists catalog names
   useEffect(() => {
@@ -153,8 +157,7 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     void refreshTransactions();
     void refreshCatalogs();
     void refreshFundMovements();
-    void refreshFundBalances();
-  }, [refreshTransactions, refreshCatalogs, refreshFundMovements, refreshFundBalances]);
+  }, [refreshTransactions, refreshCatalogs, refreshFundMovements]);
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const filteredTransactions = useMemo(

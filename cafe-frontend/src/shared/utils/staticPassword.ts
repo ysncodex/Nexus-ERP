@@ -10,7 +10,7 @@
 
 import { STORAGE_KEYS } from './constants';
 
-export type StaticUserRole = 'owner' | 'manager' | 'visitor';
+export type StaticUserRole = 'owner' | 'manager';
 
 export type StaticUser = {
   id: string;
@@ -18,7 +18,7 @@ export type StaticUser = {
   role: StaticUserRole;
 };
 
-function offlinePassword(role: Exclude<StaticUserRole, 'visitor'>): string {
+function offlinePassword(role: StaticUserRole): string {
   if (role === 'owner') return import.meta.env.VITE_OWNER_PASSWORD?.trim() ?? '';
   return import.meta.env.VITE_MANAGER_PASSWORD?.trim() ?? '';
 }
@@ -32,10 +32,7 @@ export function validateLoginPassword(password: string): boolean {
   return validateRolePassword('owner', password);
 }
 
-export function validateRolePassword(
-  role: Exclude<StaticUserRole, 'visitor'>,
-  password: string,
-): boolean {
+export function validateRolePassword(role: StaticUserRole, password: string): boolean {
   const expected = offlinePassword(role);
   if (!expected) return false;
   return password === expected;
@@ -47,8 +44,7 @@ export function validateManagerPassword(password: string): boolean {
 
 function persistUser(user: StaticUser): StaticUser {
   if (typeof window === 'undefined') return user;
-  const token = user.role === 'visitor' ? 'visitor' : 'local';
-  localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+  localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, 'local');
   localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   return user;
 }
@@ -66,10 +62,6 @@ export function loginAsManager(): StaticUser {
   return loginAs('manager');
 }
 
-export function loginAsVisitor(): StaticUser {
-  return loginAs('visitor');
-}
-
 export function logoutAndClearAllStorage(): void {
   if (typeof window === 'undefined') return;
   localStorage.clear();
@@ -83,14 +75,13 @@ export function isAuthenticated(): boolean {
 }
 
 function parseStoredRole(raw: unknown): StaticUserRole | null {
-  if (raw === 'owner' || raw === 'manager' || raw === 'visitor') return raw;
+  if (raw === 'owner' || raw === 'manager') return raw;
   return null;
 }
 
 const USER_PROFILES: Record<StaticUserRole, StaticUser> = {
   owner: { id: 'owner', name: 'Owner', role: 'owner' },
   manager: { id: 'manager', name: 'Manager', role: 'manager' },
-  visitor: { id: 'visitor', name: 'Visitor', role: 'visitor' },
 };
 
 export function getStoredUser(): StaticUser | null {
@@ -117,7 +108,6 @@ export function getStoredUser(): StaticUser | null {
 const ROLE_DISPLAY_NAME: Record<StaticUserRole, string> = {
   owner: 'Owner',
   manager: 'Manager',
-  visitor: 'Visitor',
 };
 
 export function getUserDisplayName(): string {

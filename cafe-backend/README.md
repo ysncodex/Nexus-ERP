@@ -46,7 +46,7 @@ Copy `.env.example` and fill in real values locally. **Do not commit `.env`.**
 ```bash
 npm run db:deploy     # production: prisma migrate deploy
 npm run db:migrate    # development: create + apply migration
-npm run db:seed       # seed owner, manager, visitor + menu items
+npm run db:seed       # seed owner, manager + menu items
 npm run db:generate   # regenerate Prisma client
 npm run db:check      # connectivity smoke test
 ```
@@ -57,7 +57,6 @@ npm run db:check      # connectivity smoke test
 | ---- | ----- | ----- |
 | `owner` | role + password | Full access |
 | `manager` | role + password | Operations + approval PIN |
-| `visitor` | no password | `POST /api/auth/visitor` — read-only JWT |
 
 Passwords come from `OWNER_PASSWORD` / `MANAGER_PASSWORD` in `.env`.
 
@@ -80,7 +79,6 @@ All routes are under `/api`.
 ### Auth
 
 - `POST /auth/login` — `{ role, password }` → JWT
-- `POST /auth/visitor` — read-only visitor token
 - `GET /auth/verify` — validate token
 
 ### Sales

@@ -20,5 +20,9 @@ export function verifyAuthToken(token: string): AuthTokenPayload {
   if (typeof decoded === 'string' || !decoded.sub || !('role' in decoded)) {
     throw new Error('Malformed token payload');
   }
-  return { sub: String(decoded.sub), role: decoded.role as Role };
+  const role = decoded.role as Role;
+  if (role !== 'owner' && role !== 'manager') {
+    throw new Error('Invalid token role');
+  }
+  return { sub: String(decoded.sub), role };
 }

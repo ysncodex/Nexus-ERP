@@ -22,6 +22,8 @@ import {
   UtensilsCrossed,
   ClockArrowDown,
   Package,
+  Bike,
+  PieChart,
   type LucideIcon,
 } from 'lucide-react';
 import type { SidebarProps, TabId } from './Layout.types';
@@ -68,6 +70,12 @@ const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
       },
       { id: 'report', to: '/dashboard/reports', label: 'Analytics', icon: FileBarChart },
+      {
+        id: 'product_sales',
+        to: '/dashboard/product-sales',
+        label: 'Product Sales Analysis',
+        icon: PieChart,
+      },
     ],
   },
   {
@@ -112,6 +120,12 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'daily_record', to: '/dashboard/records', label: 'All Records', icon: History },
       { id: 'fixed_cost', to: '/dashboard/fixed-costs', label: 'Fixed Costs', icon: Building2 },
       { id: 'fund', to: '/dashboard/fund', label: 'Fund Management', icon: Wallet },
+      {
+        id: 'delivery_settlement',
+        to: '/dashboard/delivery-settlements',
+        label: 'Delivery Settlements',
+        icon: Bike,
+      },
     ],
   },
   {

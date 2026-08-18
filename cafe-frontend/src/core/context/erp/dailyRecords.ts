@@ -26,6 +26,14 @@ export function computeDailyRecords(filteredTransactions: Transaction[]): DailyR
         dailyCosts: 0,
         totalSales: 0,
         dailyAvail: 0,
+        foodpandaSales: 0,
+        foodpandaCash: 0,
+        foodpandaBkash: 0,
+        foodpandaBank: 0,
+        foodiSales: 0,
+        foodiCash: 0,
+        foodiBkash: 0,
+        foodiBank: 0,
       };
     }
 
@@ -36,10 +44,34 @@ export function computeDailyRecords(filteredTransactions: Transaction[]): DailyR
       if (t.method === 'cash') rec.cashSales += val;
       if (t.method === 'bkash') rec.bkashSales += val;
       if (t.method === 'bank') rec.bankSales += val;
+
+      if (t.channel === 'foodpanda') {
+        rec.foodpandaSales += val;
+        if (t.method === 'cash') rec.foodpandaCash += val;
+        if (t.method === 'bkash') rec.foodpandaBkash += val;
+        if (t.method === 'bank') rec.foodpandaBank += val;
+      } else if (t.channel === 'foodi') {
+        rec.foodiSales += val;
+        if (t.method === 'cash') rec.foodiCash += val;
+        if (t.method === 'bkash') rec.foodiBkash += val;
+        if (t.method === 'bank') rec.foodiBank += val;
+      }
     } else if (t.type === 'sale_adjustment' && t.method) {
       if (t.method === 'cash') rec.cashSales -= val;
       if (t.method === 'bkash') rec.bkashSales -= val;
       if (t.method === 'bank') rec.bankSales -= val;
+
+      if (t.channel === 'foodpanda') {
+        rec.foodpandaSales -= val;
+        if (t.method === 'cash') rec.foodpandaCash -= val;
+        if (t.method === 'bkash') rec.foodpandaBkash -= val;
+        if (t.method === 'bank') rec.foodpandaBank -= val;
+      } else if (t.channel === 'foodi') {
+        rec.foodiSales -= val;
+        if (t.method === 'cash') rec.foodiCash -= val;
+        if (t.method === 'bkash') rec.foodiBkash -= val;
+        if (t.method === 'bank') rec.foodiBank -= val;
+      }
     }
 
     if (t.type === 'expense_product' || t.type === 'expense_fixed') {

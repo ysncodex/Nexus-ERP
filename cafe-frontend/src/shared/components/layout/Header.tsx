@@ -71,11 +71,7 @@ export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
   const roleLabel = userRole ? ROLE_LABELS[userRole] : null;
 
   const roleBadgeClass =
-    userRole === 'owner'
-      ? 'bg-amber-100 text-amber-700'
-      : userRole === 'manager'
-        ? 'bg-emerald-100 text-emerald-700'
-        : 'bg-sky-100 text-sky-700';
+    userRole === 'owner' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
 
   return (
     <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const menuCategories = [
+export const menuCategories = [
   'Add On',
   'Affogato',
   'Chicken',

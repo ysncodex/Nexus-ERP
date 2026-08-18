@@ -18,9 +18,6 @@ function requireSeedPassword(name: string): string {
 const USERS = [
   { name: 'Owner', role: 'owner' as const, password: requireSeedPassword('OWNER_PASSWORD') },
   { name: 'Manager', role: 'manager' as const, password: requireSeedPassword('MANAGER_PASSWORD') },
-  // Visitor is password-free (read-only). A random hash is stored because the
-  // login endpoint never authenticates visitors by password; they use /auth/visitor.
-  { name: 'Visitor', role: 'visitor' as const, password: null },
 ];
 
 function logDatabaseTarget() {
@@ -31,12 +28,10 @@ function logDatabaseTarget() {
 
 async function seedUsers() {
   for (const u of USERS) {
-    // Password-free roles (visitor) get an unusable random hash.
-    const rawPassword = u.password ?? `disabled-${Math.random().toString(36).slice(2)}`;
-    const passwordHash = await bcrypt.hash(rawPassword, 12);
+    const passwordHash = await bcrypt.hash(u.password, 12);
     await prisma.user.upsert({
       where: { role: u.role },
-      update: { name: u.name, ...(u.password ? { passwordHash } : {}) },
+      update: { name: u.name, passwordHash },
       create: { name: u.name, role: u.role, passwordHash },
     });
     console.log(`✔ Seeded ${u.role}`);

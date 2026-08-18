@@ -36,17 +36,6 @@ export const authService = {
     return response;
   },
 
-  // Enter as read-only visitor (no password). Issues a real JWT so the
-  // authenticated GET routes work; mutations stay blocked server-side.
-  loginAsVisitor: async (): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/visitor');
-    if (response.token) {
-      localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-    }
-    return response;
-  },
-
   // Logout user
   logout: () => {
     localStorage.removeItem('authToken');

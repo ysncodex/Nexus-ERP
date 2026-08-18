@@ -33,6 +33,8 @@ type SortField =
   | 'cashSales'
   | 'bkashSales'
   | 'bankSales'
+  | 'foodpandaSales'
+  | 'foodiSales'
   | 'dailyCosts'
   | 'dailyAvail';
 
@@ -52,6 +54,8 @@ const COLS: ColConfig[] = [
   { field: 'cashSales', label: 'Cash Received', right: true, dot: 'bg-emerald-500' },
   { field: 'bkashSales', label: 'bKash Received', right: true, dot: 'bg-fuchsia-500' },
   { field: 'bankSales', label: 'Bank Transfer', right: true, dot: 'bg-sky-500' },
+  { field: 'foodpandaSales', label: 'Foodpanda', right: true, dot: 'bg-orange-400' },
+  { field: 'foodiSales', label: 'Foodi', right: true, dot: 'bg-violet-400' },
   { field: 'dailyCosts', label: 'Total Expenses', right: true },
   { field: 'dailyAvail', label: 'Net Cash Flow', right: true },
 ];
@@ -86,6 +90,49 @@ function AmountCell({
     >
       {dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />}
       {fmt(value)} ৳
+    </span>
+  );
+}
+
+/** Amount for a delivery channel (Foodpanda/Foodi) with tiny dots + tooltip
+ * showing which payment method(s) the money actually came in through — since
+ * the channel and payment method are separate dimensions on the ledger. */
+function ChannelAmountCell({
+  value,
+  cash,
+  bkash,
+  bank,
+  dot,
+}: {
+  value: number;
+  cash: number;
+  bkash: number;
+  bank: number;
+  dot: string;
+}) {
+  if (value === 0) return <span className="text-slate-300">—</span>;
+  const parts: string[] = [];
+  if (cash) parts.push(`Cash: ${fmt(cash)} ৳`);
+  if (bkash) parts.push(`bKash: ${fmt(bkash)} ৳`);
+  if (bank) parts.push(`Bank: ${fmt(bank)} ৳`);
+  return (
+    <span
+      title={parts.length ? `Received via ${parts.join(' · ')}` : undefined}
+      className="inline-flex items-center justify-end gap-1.5 font-semibold tabular-nums whitespace-nowrap text-slate-700"
+    >
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+      {fmt(value)} ৳
+      <span className="inline-flex items-center gap-0.5">
+        {cash > 0 && (
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="via Cash" />
+        )}
+        {bkash > 0 && (
+          <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 shrink-0" title="via bKash" />
+        )}
+        {bank > 0 && (
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" title="via Bank" />
+        )}
+      </span>
     </span>
   );
 }
@@ -294,6 +341,12 @@ export default function DailyRecord() {
         case 'bankSales':
           cmp = a.bankSales - b.bankSales;
           break;
+        case 'foodpandaSales':
+          cmp = a.foodpandaSales - b.foodpandaSales;
+          break;
+        case 'foodiSales':
+          cmp = a.foodiSales - b.foodiSales;
+          break;
         case 'dailyCosts':
           cmp = a.dailyCosts - b.dailyCosts;
           break;
@@ -312,6 +365,8 @@ export default function DailyRecord() {
         cashSales: acc.cashSales + r.cashSales,
         bkashSales: acc.bkashSales + r.bkashSales,
         bankSales: acc.bankSales + r.bankSales,
+        foodpandaSales: acc.foodpandaSales + r.foodpandaSales,
+        foodiSales: acc.foodiSales + r.foodiSales,
         dailyCosts: acc.dailyCosts + r.dailyCosts,
         dailyAvail: acc.dailyAvail + r.dailyAvail,
       }),
@@ -319,6 +374,8 @@ export default function DailyRecord() {
         cashSales: 0,
         bkashSales: 0,
         bankSales: 0,
+        foodpandaSales: 0,
+        foodiSales: 0,
         dailyCosts: 0,
         dailyAvail: 0,
       }
@@ -373,6 +430,8 @@ export default function DailyRecord() {
             ['TOTAL Cash (৳)', totals.cashSales],
             ['TOTAL bKash (৳)', totals.bkashSales],
             ['TOTAL Bank (৳)', totals.bankSales],
+            ['TOTAL Foodpanda (৳)', totals.foodpandaSales],
+            ['TOTAL Foodi (৳)', totals.foodiSales],
             ['TOTAL Expenses (৳)', totals.dailyCosts],
             ['TOTAL Net Flow (৳)', totals.dailyAvail],
           ] as Array<[string, string | number]>)
@@ -593,6 +652,48 @@ export default function DailyRecord() {
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Delivery platform breakdown */}
+            {(detailRecord.foodpandaSales > 0 || detailRecord.foodiSales > 0) && (
+              <div className="mb-4 p-3.5 sm:p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Delivery Platforms{' '}
+                  <span className="font-normal normal-case text-slate-400">
+                    (included in totals above)
+                  </span>
+                </p>
+                {detailRecord.foodpandaSales > 0 && (
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
+                    <span className="text-slate-500 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                      Foodpanda
+                    </span>
+                    <ChannelAmountCell
+                      value={detailRecord.foodpandaSales}
+                      cash={detailRecord.foodpandaCash}
+                      bkash={detailRecord.foodpandaBkash}
+                      bank={detailRecord.foodpandaBank}
+                      dot="bg-orange-400"
+                    />
+                  </div>
+                )}
+                {detailRecord.foodiSales > 0 && (
+                  <div className="flex justify-between items-center text-xs sm:text-sm">
+                    <span className="text-slate-500 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                      Foodi
+                    </span>
+                    <ChannelAmountCell
+                      value={detailRecord.foodiSales}
+                      cash={detailRecord.foodiCash}
+                      bkash={detailRecord.foodiBkash}
+                      bank={detailRecord.foodiBank}
+                      dot="bg-violet-400"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -848,10 +949,27 @@ export default function DailyRecord() {
           );
         })()}
 
+      {/* ── Info strip: how Foodpanda/Foodi columns relate to payment methods ── */}
+      <div className="px-4 md:px-6 py-2.5 border-b border-slate-100 bg-amber-50/60 flex items-start gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 mt-1" />
+        <p className="text-[11px] text-amber-800 leading-relaxed">
+          <strong>Foodpanda</strong> and <strong>Foodi</strong> columns show delivery revenue that
+          is already counted inside Cash / bKash / Bank above — they're a channel breakdown, not
+          extra money. The small dots next to each amount (
+          <span className="inline-flex items-center gap-1 mx-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Cash
+            <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 inline-block" /> bKash
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 inline-block" /> Bank
+          </span>
+          ) show which payment method that delivery income was received through — hover an amount
+          for the exact split.
+        </p>
+      </div>
+
       {/* ── Table ── */}
       <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 hover:scrollbar-thumb-slate-400">
         <table
-          className={`w-full text-left ${canEdit ? 'min-w-[900px] lg:min-w-[1100px] xl:min-w-[1380px]' : 'min-w-[820px] lg:min-w-[1000px] xl:min-w-[1280px]'}`}
+          className={`w-full text-left ${canEdit ? 'min-w-[1140px] lg:min-w-[1360px] xl:min-w-[1660px]' : 'min-w-[1060px] lg:min-w-[1260px] xl:min-w-[1560px]'}`}
         >
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-slate-50 border-b-2 border-slate-200 shadow-sm">
@@ -944,6 +1062,28 @@ export default function DailyRecord() {
                   {/* Bank Transfer */}
                   <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
                     <AmountCell value={r.bankSales} dot="bg-sky-500" neutral />
+                  </td>
+
+                  {/* Foodpanda */}
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
+                    <ChannelAmountCell
+                      value={r.foodpandaSales}
+                      cash={r.foodpandaCash}
+                      bkash={r.foodpandaBkash}
+                      bank={r.foodpandaBank}
+                      dot="bg-orange-400"
+                    />
+                  </td>
+
+                  {/* Foodi */}
+                  <td className="px-4 sm:px-5 py-3 sm:py-2.5 text-right text-xs">
+                    <ChannelAmountCell
+                      value={r.foodiSales}
+                      cash={r.foodiCash}
+                      bkash={r.foodiBkash}
+                      bank={r.foodiBank}
+                      dot="bg-violet-400"
+                    />
                   </td>
 
                   {/* Total Expenses */}
@@ -1044,6 +1184,16 @@ export default function DailyRecord() {
                 <td className="px-4 sm:px-5 py-3.5 text-right">
                   <span className="text-xs font-bold text-slate-800 tabular-nums whitespace-nowrap">
                     {fmt(totals.bankSales)} ৳
+                  </span>
+                </td>
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-orange-600 tabular-nums whitespace-nowrap">
+                    {fmt(totals.foodpandaSales)} ৳
+                  </span>
+                </td>
+                <td className="px-4 sm:px-5 py-3.5 text-right">
+                  <span className="text-xs font-bold text-violet-600 tabular-nums whitespace-nowrap">
+                    {fmt(totals.foodiSales)} ৳
                   </span>
                 </td>
                 <td className="px-4 sm:px-5 py-3.5 text-right">

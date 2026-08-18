@@ -98,3 +98,14 @@ export function isPaidSale(t: Transaction): boolean {
   const status = t.receiptStatus ?? 'completed';
   return status === 'completed';
 }
+
+/**
+ * Lump-sum Foodpanda/Foodi payout posted by Delivery Settlements (not a POS
+ * customer order). These count as channel/method revenue but must not be
+ * treated as kitchen/POS tickets — they have no line items.
+ */
+export function isDeliverySettlementSale(t: Transaction): boolean {
+  if (t.type !== 'sale') return false;
+  if (t.orderNumber?.startsWith('STL-')) return true;
+  return (t.category ?? '').toLowerCase().includes('settlement');
+}

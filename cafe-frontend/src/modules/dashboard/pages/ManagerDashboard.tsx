@@ -33,6 +33,7 @@ import { handleError } from '@/shared/utils';
 import { businessDateKey, todayBusinessKey, formatBusinessTime } from '@/shared/utils/businessDate';
 import { getUserDisplayName } from '@/shared/utils/staticPassword';
 import type { Transaction, PaymentMethod } from '@/core/types';
+import { isDeliverySettlementSale } from '@/core/types';
 
 // ─── Utility functions ────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ function useShiftStats(transactions: Transaction[]) {
       if (t.type === 'sale') {
         const amt = Number(t.amount);
         revenue += amt;
-        orderCount++;
+        if (!isDeliverySettlementSale(t)) orderCount++;
         todaySales.push(t);
         if (t.method) byMethod[t.method] += amt;
         if (t.channel) byChannel[t.channel] += amt;
@@ -258,6 +259,26 @@ export default function ManagerDashboard() {
 
   const managerName = getUserDisplayName();
 
+  // Keep the shift view live: poll while this page is open, and pull fresh
+  // numbers whenever the tab/window becomes visible again (e.g. after a
+  // cashier posts an order on another screen).
+  useEffect(() => {
+    const pull = () => {
+      void refreshTransactions({ silent: true });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pull();
+    };
+    const id = window.setInterval(pull, 20_000);
+    window.addEventListener('focus', pull);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', pull);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshTransactions]);
+
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
@@ -310,7 +331,7 @@ export default function ManagerDashboard() {
         <KpiCard
           label="Orders"
           value={shift.orderCount.toLocaleString()}
-          hint="Completed this shift"
+          hint="POS orders this shift"
           icon={ShoppingCart}
           accent="text-slate-800"
           iconBg="bg-amber-50 text-amber-600"
@@ -387,6 +408,11 @@ export default function ManagerDashboard() {
                         {order.description || 'Sale'}
                       </p>
                       <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                        {isDeliverySettlementSale(order) && (
+                          <span className="font-bold uppercase tracking-wide text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">
+                            Settlement
+                          </span>
+                        )}
                         {order.orderNumber && (
                           <span className="font-mono">{order.orderNumber}</span>
                         )}

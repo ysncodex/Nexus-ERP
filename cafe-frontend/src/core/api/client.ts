@@ -48,16 +48,6 @@ apiClient.interceptors.request.use(
   }
 );
 
-function isVisitorSession(): boolean {
-  try {
-    const raw = localStorage.getItem('user');
-    if (!raw) return false;
-    return (JSON.parse(raw) as { role?: string })?.role === 'visitor';
-  } catch {
-    return false;
-  }
-}
-
 /**
  * A failure is transient when it is caused by the backend waking up, a brief
  * network blip, or the HTTP/2 connection refusing streams while the server is
@@ -143,9 +133,7 @@ apiClient.interceptors.response.use(
     // Session expired on a normal request → clear token and bounce to login.
     // ONLY a genuine 401 does this — never a network/cold-start failure — so
     // temporary backend unavailability can't force the user to log out.
-    // Skip for visitor sessions: a rejected read-only token must not trigger a
-    // redirect loop back into the app — pages degrade to empty data instead.
-    if (error.response?.status === 401 && !isAuthAttempt && !isVisitorSession()) {
+    if (error.response?.status === 401 && !isAuthAttempt) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       window.location.href = '/';

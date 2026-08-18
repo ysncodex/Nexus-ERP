@@ -42,7 +42,7 @@ Passwords are never hardcoded in source — only in `.env` (gitignored) or host 
 - **Expenses** — product and fixed costs
 - **Funds** — cash/bank/bKash movements
 - **Reports** — daily, monthly, P&L, CSV export
-- **Roles** — owner, manager (with PIN), visitor (read-only)
+- **Roles** — owner, manager (with PIN)
 
 ---
 
@@ -60,8 +60,7 @@ The ERP uses **Asia/Dhaka (UTC+6)** for “today” everywhere:
 ## Authentication flow
 
 1. **Production** — `POST /api/auth/login` with role + password → JWT stored in localStorage
-2. **Visitor** — `POST /api/auth/visitor` → read-only JWT
-3. **Offline fallback** — if API fails, checks `VITE_OWNER_PASSWORD` / `VITE_MANAGER_PASSWORD`
+2. **Offline fallback** — if API fails, checks `VITE_OWNER_PASSWORD` / `VITE_MANAGER_PASSWORD`
 
 Manager-sensitive actions (delete, some edits) require the manager password modal.
 

@@ -30,10 +30,12 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { menuService } from '@/core/api/services';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { menuService, salesService } from '@/core/api/services';
 import { useCanMutate } from '@/shared/hooks';
 import { useERP } from '@/core/context/useERP';
 import { notifyReadOnlyBlocked } from '@/shared/utils';
+import type { Transaction, PaymentMethod } from '@/core/types';
 import { clearLegacyPosStorage } from '../utils/posStorageMigration';
 import {
   ALL_CATEGORIES,
@@ -47,8 +49,19 @@ import {
 } from '../types/menuItem.types';
 import { RECEIPT_CSS, buildCustomerReceiptHTML, buildKitchenChitHTML } from '../utils/receiptPrint';
 import { printOrderAsync } from '../utils/posPrintService';
-import { NO_TABLE, computeOrderTotals, buildDraftOrder } from '../utils/orderUtils';
+import {
+  NO_TABLE,
+  computeOrderTotals,
+  buildDraftOrder,
+  orderToSalePayload,
+  transactionToOrder,
+  transactionToSaleUpdate,
+  orderLabel,
+} from '../utils/orderUtils';
 import { PaymentPanel } from '../components/PaymentPanel';
+import { PendingOrdersDrawer } from '../components/PendingOrdersDrawer';
+import { PendingPaymentModal } from '../components/PendingPaymentModal';
+import { ManagerPasswordModal } from '@/shared/components/ui';
 import { getOfflineQueueCount, isPosOnline, persistPosOrder } from '../utils/posOfflineQueue';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -58,6 +71,20 @@ const CHANNEL_LABELS: Record<string, string> = {
   takeaway: 'Takeaway',
   delivery: 'Delivery',
 };
+
+const DELIVERY_PLATFORM_LABELS: Record<string, string> = {
+  foodpanda: 'Foodpanda',
+  foodi: 'Foodi',
+};
+
+/** "Delivery" alone doesn't say which platform — append it when known. */
+function channelDisplayLabel(order: Pick<NewOrderData, 'channel' | 'deliveryPlatform'>): string {
+  const base = CHANNEL_LABELS[order.channel] ?? order.channel;
+  if (order.channel === 'delivery' && order.deliveryPlatform) {
+    return `${base} · ${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform]}`;
+  }
+  return base;
+}
 
 const ITEMS_PER_PAGE = 12;
 
@@ -460,7 +487,7 @@ function OrderCompletionModal({
               { label: 'Bill', value: `৳${order.total}` },
               {
                 label: hasTable ? 'Table' : 'Channel',
-                value: hasTable ? order.tableNumber : CHANNEL_LABELS[order.channel],
+                value: hasTable ? order.tableNumber : channelDisplayLabel(order),
               },
             ].map((s) => (
               <div
@@ -500,7 +527,7 @@ function OrderCompletionModal({
                 paymentMethod={order.paymentMethod}
                 customerPaidStr={customerPaidStr}
                 onPaidChange={setCustomerPaidStr}
-                channelLabel={CHANNEL_LABELS[order.channel]}
+                channelLabel={channelDisplayLabel(order)}
                 discountAmount={order.discount > 0 ? order.discount : undefined}
               />
             </div>
@@ -582,11 +609,143 @@ function OrderCompletionModal({
   );
 }
 
+// ─── Update (already-completed) Order Modal ──────────────────────────────────
+// Editing an invoice that was already paid shouldn't re-collect payment — just
+// let the cashier confirm the corrected items/total and choose whether a
+// fresh receipt is needed.
+
+function UpdateOrderModal({
+  order,
+  onClose,
+  onUpdate,
+  updating,
+}: {
+  order: NewOrderData;
+  onClose: () => void;
+  onUpdate: (order: NewOrderData, print: boolean) => Promise<void>;
+  updating: 'reprint' | 'silent' | null;
+}) {
+  const hasTable = order.tableNumber && order.tableNumber !== NO_TABLE;
+  const busy = updating !== null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/55 backdrop-blur-sm">
+      <div className="bg-slate-50 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/80">
+        <div className="relative bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 px-5 pt-5 pb-5 text-white shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-11 h-11 bg-white/15 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+              <ReceiptText size={22} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold leading-tight">Update Order</h2>
+              <p className="text-xs text-indigo-100/90 font-medium">{order.orderNumber}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              {
+                label: 'Items',
+                value: String(order.items.reduce((s, o) => s + o.quantity, 0)),
+              },
+              { label: 'Bill', value: `৳${order.total}` },
+              {
+                label: hasTable ? 'Table' : 'Channel',
+                value: hasTable ? order.tableNumber : channelDisplayLabel(order),
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="bg-white/10 backdrop-blur-sm rounded-xl px-2 py-2 text-center border border-white/10"
+              >
+                <p className="text-[9px] opacity-80 uppercase tracking-wider">{s.label}</p>
+                <p className="text-sm font-bold leading-snug truncate tabular-nums">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/80 p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500 mb-1">
+              Updated items
+            </p>
+            {order.items.map((oi, i) => (
+              <div
+                key={`${oi.menuItem.id}-${i}`}
+                className="flex items-center justify-between text-sm gap-2"
+              >
+                <span className="text-slate-700 truncate">
+                  {oi.quantity} × {oi.menuItem.name}
+                  {oi.isGift && (
+                    <span className="ml-1.5 text-[10px] font-bold text-emerald-600 uppercase">
+                      Gift
+                    </span>
+                  )}
+                </span>
+                <span className="font-semibold text-slate-800 tabular-nums shrink-0">
+                  {oi.isGift ? 'FREE' : `৳${oi.menuItem.price * oi.quantity}`}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between text-sm font-bold text-slate-900 border-t border-slate-100 pt-2 mt-1">
+              <span>Total</span>
+              <span className="tabular-nums">৳{order.total}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-slate-200 shrink-0 space-y-2.5 bg-white">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onUpdate(order, true)}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm transition-colors disabled:opacity-50 shadow-lg shadow-indigo-200/40"
+          >
+            {updating === 'reprint' ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Printer size={16} />
+            )}
+            Update &amp; Re-print Receipt
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onUpdate(order, false)}
+            className="w-full flex items-center justify-center gap-1.5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            {updating === 'silent' ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Send size={13} />
+            )}
+            Update without Printing
+          </button>
+          <p className="text-[10px] text-center text-slate-400 leading-relaxed px-2">
+            This invoice was already paid — updating saves the corrected items/total without
+            collecting payment again.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function NewOrder() {
   const canMutate = useCanMutate();
-  const { refreshTransactions } = useERP();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { refreshTransactions, transactions, deleteTransaction } = useERP();
 
   const [catalog, setCatalog] = useState<MenuItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -598,6 +757,7 @@ export default function NewOrder() {
   const [tableNumber, setTableNumber] = useState<string>(NO_TABLE);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'bkash'>('cash');
   const [channel, setChannel] = useState<'in_store' | 'takeaway' | 'delivery'>('in_store');
+  const [deliveryPlatform, setDeliveryPlatform] = useState<'foodpanda' | 'foodi'>('foodpanda');
 
   const [discountType, setDiscountType] = useState<DiscountType>('flat');
   const [discountStr, setDiscountStr] = useState('');
@@ -606,6 +766,24 @@ export default function NewOrder() {
   const [addonTargetId, setAddonTargetId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(() => isPosOnline());
   const [offlineQueueCount, setOfflineQueueCount] = useState(() => getOfflineQueueCount());
+
+  // ── Editing an existing invoice (pending resume, or completed order edit from
+  // Order History) — resume/complete/delete from this page ──
+  const [editingSale, setEditingSale] = useState<{
+    id: string;
+    orderNumber: string;
+    /** Status the order had when editing started — decides which finish flow
+     * to show: pending orders still collect payment; completed orders just
+     * offer "re-print or not". */
+    originalStatus: 'pending' | 'completed';
+    /** True when opened via Order History's Edit button (?editOrder=) — we
+     * navigate back there once the update is saved. */
+    fromOrderHistory: boolean;
+  } | null>(null);
+  const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
+  const [payingPendingTx, setPayingPendingTx] = useState<Transaction | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Transaction | null>(null);
+  const [showPendingDeleteAuth, setShowPendingDeleteAuth] = useState(false);
 
   const [mobileView, setMobileView] = useState<'menu' | 'cart'>('menu');
   const [currentPage, setCurrentPage] = useState(1);
@@ -766,11 +944,29 @@ export default function NewOrder() {
     setDiscountType('flat');
     setPaymentMethod('cash');
     setChannel('in_store');
+    setDeliveryPlatform('foodpanda');
     setMobileView('menu');
+    setEditingSale(null);
   }, []);
+
+  // ── Pending orders visible on this page (any date — not just today) ──
+  const pendingOrders = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.type === 'sale' && t.receiptStatus === 'pending')
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [transactions]
+  );
 
   const saveOrder = useCallback(
     async (order: NewOrderData, status: 'completed' | 'pending'): Promise<'posted' | 'queued'> => {
+      if (editingSale) {
+        // Editing/resuming a pending order updates the same record instead of
+        // creating a duplicate — orderNumber/id are preserved by buildDraftOrder.
+        await salesService.update(editingSale.id, orderToSalePayload(order, status));
+        refreshTransactions().catch(console.error);
+        return 'posted';
+      }
       const result = await persistPosOrder(order, status);
       if (result === 'queued') {
         setOfflineQueueCount(getOfflineQueueCount());
@@ -780,8 +976,121 @@ export default function NewOrder() {
       }
       return result;
     },
+    [refreshTransactions, editingSale]
+  );
+
+  const handleResumeOrder = useCallback(
+    (tx: Transaction, opts?: { fromOrderHistory?: boolean }): boolean => {
+      const draft = transactionToOrder(tx);
+      if (!draft) {
+        toast.error('This order cannot be edited — line items are missing');
+        return false;
+      }
+      // Re-associate with the live catalog by id where possible so price/
+      // category/availability reflect the current menu, not just the snapshot.
+      const hydratedItems: OrderItem[] = draft.items.map((oi) => {
+        const live = catalog.find((c) => c.id === oi.menuItem.id);
+        return live ? { ...oi, menuItem: live } : oi;
+      });
+      const originalStatus: 'pending' | 'completed' =
+        tx.receiptStatus === 'pending' ? 'pending' : 'completed';
+      setOrderItems(hydratedItems);
+      setCustomerName(draft.customerName);
+      setTableNumber(
+        draft.tableNumber && draft.tableNumber !== NO_TABLE ? draft.tableNumber : NO_TABLE
+      );
+      setPaymentMethod(draft.paymentMethod);
+      setChannel(draft.channel);
+      setDeliveryPlatform(draft.deliveryPlatform ?? 'foodpanda');
+      setDiscountType(draft.discountType ?? 'flat');
+      setDiscountStr(draft.discountValue ? String(draft.discountValue) : '');
+      setEditingSale({
+        id: tx.id,
+        orderNumber: tx.orderNumber ?? draft.orderNumber,
+        originalStatus,
+        fromOrderHistory: Boolean(opts?.fromOrderHistory),
+      });
+      setPendingDrawerOpen(false);
+      setMobileView('cart');
+      toast.message(
+        originalStatus === 'pending'
+          ? `Editing pending order ${orderLabel(tx)}`
+          : `Editing order ${orderLabel(tx)}`,
+        {
+          description:
+            originalStatus === 'pending'
+              ? 'Adjust items, then Save Pending or Complete Order.'
+              : 'Adjust items, then choose to re-print or update without printing.',
+        }
+      );
+      return true;
+    },
+    [catalog]
+  );
+
+  // ── Deep-link from Order History: /new-order?editOrder=<transactionId> ──
+  const editOrderParam = searchParams.get('editOrder');
+  useEffect(() => {
+    if (!editOrderParam || catalogLoading) return;
+    const tx = transactions.find((t) => t.id === editOrderParam);
+    if (!tx) {
+      toast.error('That order could not be found');
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('editOrder');
+        return next;
+      });
+      return;
+    }
+    handleResumeOrder(tx, { fromOrderHistory: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('editOrder');
+        return next;
+      },
+      { replace: true }
+    );
+    // Only re-run when the param itself changes — handleResumeOrder/transactions
+    // are stable-ish but we don't want catalog hydration ticks to re-trigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editOrderParam, catalogLoading]);
+
+  const handleCompletePendingPayment = useCallback(
+    async (
+      updated: Transaction,
+      payment: { method: PaymentMethod; customerPaid: number; changeAmount: number }
+    ) => {
+      try {
+        await salesService.update(updated.id, transactionToSaleUpdate(updated, payment));
+        await refreshTransactions();
+        toast.success(`Payment received · ${orderLabel(updated)} completed`);
+        setPayingPendingTx(null);
+      } catch {
+        toast.error('Failed to complete payment');
+      }
+    },
     [refreshTransactions]
   );
+
+  const requestDeletePending = useCallback((tx: Transaction) => {
+    setDeleteCandidate(tx);
+    setShowPendingDeleteAuth(true);
+  }, []);
+
+  const confirmDeletePending = useCallback(async () => {
+    if (!deleteCandidate) return;
+    const tx = deleteCandidate;
+    try {
+      await deleteTransaction(tx.id);
+      if (editingSale?.id === tx.id) resetPos();
+      toast.success(`Pending order ${orderLabel(tx)} deleted`);
+    } catch {
+      toast.error('Failed to delete pending order');
+    } finally {
+      setDeleteCandidate(null);
+    }
+  }, [deleteCandidate, deleteTransaction, editingSale, resetPos]);
 
   const orderSavedMessage = useCallback(
     (order: NewOrderData, status: 'completed' | 'pending', result: 'posted' | 'queued') => {
@@ -809,16 +1118,25 @@ export default function NewOrder() {
       toast.error(`Select a table to complete a ${CHANNEL_LABELS[channel]} order`);
       return;
     }
+    const draft = buildDraftOrder({
+      items: orderItems,
+      customerName,
+      tableNumber,
+      paymentMethod,
+      channel,
+      deliveryPlatform,
+      discountType,
+      discountValue,
+      existingId: editingSale?.id,
+      existingOrderNumber: editingSale?.orderNumber,
+    });
+    // Already-paid invoices being corrected shouldn't show a stale ৳0-paid /
+    // ৳0-change on the re-printed receipt — assume the corrected total was
+    // settled exactly (no cash re-collection UI for this flow).
     setDraftOrder(
-      buildDraftOrder({
-        items: orderItems,
-        customerName,
-        tableNumber,
-        paymentMethod,
-        channel,
-        discountType,
-        discountValue,
-      })
+      editingSale?.originalStatus === 'completed'
+        ? { ...draft, customerPaid: draft.total, changeAmount: 0 }
+        : draft
     );
   }, [
     canMutate,
@@ -827,53 +1145,126 @@ export default function NewOrder() {
     tableNumber,
     paymentMethod,
     channel,
+    deliveryPlatform,
     discountType,
     discountValue,
     needsTable,
+    editingSale,
   ]);
 
   const handlePrintAndComplete = useCallback(
     async (order: NewOrderData, kind: 'customer' | 'both') => {
+      const backToOrderHistory = editingSale?.fromOrderHistory;
       const result = await saveOrder(order, 'completed');
       toast.success(orderSavedMessage(order, 'completed', result), {
         description:
           result === 'queued' ? `${getOfflineQueueCount()} receipt(s) waiting to sync` : undefined,
       });
       resetPos();
+      if (backToOrderHistory) navigate('/dashboard/order-history');
       void kind;
     },
-    [saveOrder, resetPos, orderSavedMessage]
+    [saveOrder, resetPos, orderSavedMessage, editingSale, navigate]
   );
 
   const handleSubmitPending = useCallback(
     async (order: NewOrderData) => {
+      const backToOrderHistory = editingSale?.fromOrderHistory;
       const result = await saveOrder(order, 'pending');
       toast.success(orderSavedMessage(order, 'pending', result), {
         description:
           result === 'queued' ? `${getOfflineQueueCount()} receipt(s) waiting to sync` : undefined,
       });
       resetPos();
+      if (backToOrderHistory) navigate('/dashboard/order-history');
     },
-    [saveOrder, resetPos, orderSavedMessage]
+    [saveOrder, resetPos, orderSavedMessage, editingSale, navigate]
+  );
+
+  const [updatingOrder, setUpdatingOrder] = useState<'reprint' | 'silent' | null>(null);
+
+  /** Finish editing an already-completed invoice — no payment re-collection,
+   * just "did the total/items change, and do you want a fresh receipt?" */
+  const handleUpdateExistingOrder = useCallback(
+    async (order: NewOrderData, print: boolean) => {
+      const backToOrderHistory = editingSale?.fromOrderHistory;
+      setUpdatingOrder(print ? 'reprint' : 'silent');
+      try {
+        await saveOrder(order, 'completed');
+        if (print) {
+          const ok = await printOrderAsync(order, 'customer');
+          if (!ok) toast.error('Pop-up blocked — allow pop-ups and retry printing');
+        }
+        toast.success(`Order ${order.orderNumber} updated${print ? ' · receipt re-printed' : ''}`);
+        setDraftOrder(null);
+        resetPos();
+        if (backToOrderHistory) navigate('/dashboard/order-history');
+      } catch {
+        toast.error('Failed to update order');
+      } finally {
+        setUpdatingOrder(null);
+      }
+    },
+    [saveOrder, resetPos, editingSale, navigate]
   );
 
   const showMobileCartBar = mobileView === 'menu' && totalItems > 0;
 
   return (
     <div className="flex flex-col gap-3 min-h-0 lg:h-[calc(100dvh-140px)] lg:min-h-[600px]">
-      {!isOnline && (
-        <div
-          role="status"
-          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 shrink-0"
-        >
-          <WifiOff size={16} className="shrink-0 text-amber-700" />
-          <span>
-            <strong>Offline mode</strong> — orders are saved locally and upload from{' '}
-            <strong>POS Sync</strong> when Wi-Fi returns.
-            {offlineQueueCount > 0 && (
-              <span className="ml-1 font-semibold">({offlineQueueCount} waiting)</span>
-            )}
-          </span>
+      {(!isOnline || pendingOrders.length > 0 || editingSale) && (
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          {!isOnline && (
+            <div
+              role="status"
+              className="flex-1 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+            >
+              <WifiOff size={16} className="shrink-0 text-amber-700" />
+              <span>
+                <strong>Offline mode</strong> — orders are saved locally and upload from{' '}
+                <strong>POS Sync</strong> when Wi-Fi returns.
+                {offlineQueueCount > 0 && (
+                  <span className="ml-1 font-semibold">({offlineQueueCount} waiting)</span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {editingSale && (
+            <div className="flex-1 flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900">
+              <span className="flex items-center gap-2 min-w-0">
+                <ReceiptText size={16} className="shrink-0 text-blue-700" />
+                <span className="truncate">
+                  Editing {editingSale.originalStatus === 'pending' ? 'pending ' : ''}order{' '}
+                  <strong>{editingSale.orderNumber}</strong>
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  resetPos();
+                  if (editingSale.fromOrderHistory) navigate('/dashboard/order-history');
+                }}
+                className="shrink-0 text-xs font-bold text-blue-700 hover:text-blue-900 underline underline-offset-2"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {pendingOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPendingDrawerOpen(true)}
+              className="shrink-0 flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-100 hover:bg-amber-200/80 px-4 py-2.5 text-sm font-bold text-amber-800 transition-colors"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-600" />
+              </span>
+              Pending Orders ({pendingOrders.length})
+            </button>
+          )}
         </div>
       )}
 
@@ -1068,6 +1459,38 @@ export default function NewOrder() {
               ))}
             </div>
 
+            {channel === 'delivery' && (
+              <div className="grid grid-cols-2 gap-1.5 -mt-1.5">
+                {(
+                  [
+                    { val: 'foodpanda', label: 'Foodpanda', dot: 'bg-orange-400' },
+                    { val: 'foodi', label: 'Foodi', dot: 'bg-violet-400' },
+                  ] as const
+                ).map(({ val, label, dot }) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setDeliveryPlatform(val)}
+                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+                      deliveryPlatform === val
+                        ? 'border-amber-400 bg-amber-50 text-amber-700'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {channel === 'delivery' && (
+              <p className="text-[10px] text-slate-400 leading-relaxed -mt-1">
+                Use this for delivery tickets taken at the till. Platform payouts
+                (Foodpanda/Foodi invoices) belong on Delivery Settlements — recording both for
+                the same invoice would double-count that channel.
+              </p>
+            )}
+
             <div className={needsTable ? 'grid grid-cols-2 gap-2' : ''}>
               <div className="relative">
                 <User
@@ -1210,7 +1633,11 @@ export default function NewOrder() {
               }`}
             >
               <CheckCircle2 size={18} />
-              {canMutate ? 'Complete Order' : 'Preview Only'}
+              {!canMutate
+                ? 'Preview Only'
+                : editingSale?.originalStatus === 'completed'
+                  ? 'Update Order'
+                  : 'Complete Order'}
             </button>
             {!canMutate && (
               <p className="text-[11px] text-center text-slate-400 mt-2 leading-relaxed">
@@ -1240,13 +1667,22 @@ export default function NewOrder() {
           </button>
         )}
 
-        {draftOrder && (
-          <OrderCompletionModal
+        {draftOrder && editingSale?.originalStatus === 'completed' ? (
+          <UpdateOrderModal
             order={draftOrder}
             onClose={() => setDraftOrder(null)}
-            onPrintAndComplete={handlePrintAndComplete}
-            onSubmitPending={handleSubmitPending}
+            onUpdate={handleUpdateExistingOrder}
+            updating={updatingOrder}
           />
+        ) : (
+          draftOrder && (
+            <OrderCompletionModal
+              order={draftOrder}
+              onClose={() => setDraftOrder(null)}
+              onPrintAndComplete={handlePrintAndComplete}
+              onSubmitPending={handleSubmitPending}
+            />
+          )
         )}
 
         {/* Render our new Add-on Selection Modal safely */}
@@ -1255,6 +1691,41 @@ export default function NewOrder() {
           catalog={catalog}
           onClose={() => setAddonTargetId(null)}
           onSelect={handleAddAddon}
+        />
+
+        <PendingOrdersDrawer
+          isOpen={pendingDrawerOpen}
+          onClose={() => setPendingDrawerOpen(false)}
+          orders={pendingOrders}
+          canMutate={canMutate}
+          onResume={handleResumeOrder}
+          onPayNow={(tx) => {
+            setPendingDrawerOpen(false);
+            setPayingPendingTx(tx);
+          }}
+          onDelete={requestDeletePending}
+        />
+
+        {payingPendingTx && (
+          <PendingPaymentModal
+            tx={payingPendingTx}
+            onClose={() => setPayingPendingTx(null)}
+            onComplete={handleCompletePendingPayment}
+          />
+        )}
+
+        <ManagerPasswordModal
+          isOpen={showPendingDeleteAuth}
+          onClose={() => {
+            setShowPendingDeleteAuth(false);
+            setDeleteCandidate(null);
+          }}
+          onConfirm={() => {
+            setShowPendingDeleteAuth(false);
+            void confirmDeletePending();
+          }}
+          title="Delete Pending Order"
+          requiredRole="owner"
         />
       </div>
     </div>

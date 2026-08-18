@@ -44,6 +44,8 @@ export const DAILY_RECORD_EXPORT_COLUMNS: ColDef<DailyRecord>[] = [
   { header: 'Cash (BDT)', accessor: 'cashSales', width: 14 },
   { header: 'bKash (BDT)', accessor: 'bkashSales', width: 14 },
   { header: 'Bank (BDT)', accessor: 'bankSales', width: 14 },
+  { header: 'Foodpanda (BDT)', accessor: 'foodpandaSales', width: 15 },
+  { header: 'Foodi (BDT)', accessor: 'foodiSales', width: 14 },
   { header: 'Expenses (BDT)', accessor: 'dailyCosts', width: 14 },
   { header: 'Net Flow (BDT)', accessor: 'dailyAvail', width: 14 },
 ];

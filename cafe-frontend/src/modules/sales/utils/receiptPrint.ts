@@ -36,6 +36,21 @@ const CHANNEL_LABELS: Record<string, string> = {
   delivery: 'Delivery',
 };
 
+const DELIVERY_PLATFORM_LABELS: Record<string, string> = {
+  foodpanda: 'Foodpanda',
+  foodi: 'Foodi',
+};
+
+/** "Delivery" alone doesn't say which platform — append it when known, so
+ * kitchen staff can tell Foodpanda/Foodi orders apart on the printed chit. */
+function channelDisplayLabel(order: NewOrderData): string {
+  const base = CHANNEL_LABELS[order.channel] ?? order.channel;
+  if (order.channel === 'delivery' && order.deliveryPlatform) {
+    return `${base} (${DELIVERY_PLATFORM_LABELS[order.deliveryPlatform]})`;
+  }
+  return base;
+}
+
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
 export function money(n: number): string {
@@ -184,7 +199,7 @@ export function buildCustomerReceiptHTML(order: NewOrderData): string {
 
   const metaRows: string[] = [
     `<div class="rcpt-row"><span class="rcpt-label">Order #</span><span class="rcpt-strong">${esc(order.orderNumber)}</span></div>`,
-    `<div class="rcpt-row"><span class="rcpt-label">Type</span><span>${esc(CHANNEL_LABELS[order.channel] ?? order.channel)}</span></div>`,
+    `<div class="rcpt-row"><span class="rcpt-label">Type</span><span>${esc(channelDisplayLabel(order))}</span></div>`,
   ];
   if (hasTable(order)) {
     metaRows.push(
@@ -299,7 +314,7 @@ export function buildKitchenChitHTML(order: NewOrderData): string {
   return `
 <div class="chit">
   <div class="chit-title">KITCHEN</div>
-  <div class="chit-type">${esc(CHANNEL_LABELS[order.channel] ?? order.channel)}</div>
+  <div class="chit-type">${esc(channelDisplayLabel(order))}</div>
   ${tableHTML}
   <hr class="rcpt-hr-solid" />
   <div class="chit-meta">

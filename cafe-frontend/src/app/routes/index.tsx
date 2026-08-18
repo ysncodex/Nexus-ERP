@@ -19,6 +19,7 @@ const DailyExpense   = lazy(() => import('@/modules/finance/pages/DailyExpense')
 const DailyRecord    = lazy(() => import('@/modules/finance/pages/DailyRecord'));
 const FixedCosts     = lazy(() => import('@/modules/finance/pages/FixedCosts'));
 const FundManagement = lazy(() => import('@/modules/finance/pages/FundManagement'));
+const DeliverySettlements = lazy(() => import('@/modules/finance/pages/DeliverySettlements'));
 
 // ── Sales ─────────────────────────────────────────────────────────────────────
 const NewOrder     = lazy(() => import('@/modules/sales/pages/NewOrder'));
@@ -36,6 +37,7 @@ const Payroll     = lazy(() => import('@/modules/hr/pages/Payroll'));
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 const Reports = lazy(() => import('@/modules/reports/pages/Reports'));
+const ProductSalesAnalysis = lazy(() => import('@/modules/reports/pages/ProductSalesAnalysis'));
 
 export function AppRoutes() {
   return (
@@ -65,6 +67,7 @@ export function AppRoutes() {
           <Route path="records"       element={<DailyRecord />} />
           <Route path="fixed-costs"   element={<FixedCosts />} />
           <Route path="fund"          element={<FundManagement />} />
+          <Route path="delivery-settlements" element={<DeliverySettlements />} />
 
           {/* Sales */}
           <Route path="new-order"      element={<NewOrder />} />
@@ -82,6 +85,7 @@ export function AppRoutes() {
 
           {/* Reports */}
           <Route path="reports" element={<Reports />} />
+          <Route path="product-sales" element={<ProductSalesAnalysis />} />
         </Route>
 
         {/* Fallback */}

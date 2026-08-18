@@ -13,9 +13,9 @@ export interface SidebarProps {
 
 export type TabId =
   // Main
-  | 'dashboard' | 'manager_dashboard' | 'daily_record' | 'report'
+  | 'dashboard' | 'manager_dashboard' | 'daily_record' | 'report' | 'product_sales'
   // Operations
-  | 'daily_expense' | 'product_cost' | 'fixed_cost' | 'fund'
+  | 'daily_expense' | 'product_cost' | 'fixed_cost' | 'fund' | 'delivery_settlement'
   // Revenue
   | 'pos_sync' | 'new_order' | 'product_list' | 'order_history'
   // Inventory
