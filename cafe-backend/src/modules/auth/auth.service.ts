@@ -39,19 +39,3 @@ export async function getPublicUserById(id: string): Promise<PublicUser> {
   if (!user) throw ApiError.unauthorized('User no longer exists');
   return { id: user.id, name: user.name, role: user.role };
 }
-
-/**
- * Issue a read-only visitor token (no password). Visitors can read data via the
- * `authenticate`-only GET routes; all mutations stay blocked by `requireRole`.
- * Uses the seeded visitor user when present, otherwise a stable synthetic id.
- */
-export async function loginVisitor(): Promise<LoginResult> {
-  const user = await prisma.user.findFirst({ where: { role: 'visitor' } });
-  const id = user?.id ?? 'visitor';
-  const name = user?.name ?? 'Visitor';
-
-  return {
-    token: signAuthToken(id, 'visitor' as Role),
-    user: { id, name, role: 'visitor' as Role },
-  };
-}

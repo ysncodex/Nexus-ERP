@@ -13,7 +13,9 @@ function stripGiftSuffix(name: string): string {
   return name.replace(/ \(Gift\)$/, '');
 }
 
-function resolveOrderLines(data: SaleCreateInput): OrderItemInput[] {
+function resolveOrderLines(
+  data: Pick<SaleCreateInput, 'orderItems' | 'receiptLines'>
+): OrderItemInput[] {
   if (data.orderItems?.length) return data.orderItems;
 
   if (!data.receiptLines?.length) return [];
@@ -229,11 +231,39 @@ export async function updateSaleRecord(id: string, data: SaleUpdateInput) {
   });
 
   const orderPatch = buildLinkedOrderUpdate(data);
-  if (existing.order && Object.keys(orderPatch).length > 0) {
-    await prisma.order.update({
-      where: { id: existing.order.id },
-      data: orderPatch,
-    });
+  if (existing.order) {
+    // Editing a pending order's cart (New Order → resume & edit) sends a fresh
+    // orderItems array. Replace the relational line items to match — the create
+    // path already builds them the same way, so re-use that shape here.
+    if (data.orderItems !== undefined) {
+      const lines = resolveOrderLines(data);
+      const subtotal = data.subtotal ?? computeSubtotal(lines);
+      orderPatch.subtotal = data.subtotal !== undefined ? data.subtotal : subtotal;
+
+      await prisma.order.update({
+        where: { id: existing.order.id },
+        data: {
+          ...orderPatch,
+          items: {
+            deleteMany: {},
+            create: lines.map((line) => ({
+              menuItemId: line.menuItemId,
+              nameSnapshot: line.name,
+              unitPrice: line.unitPrice,
+              quantity: line.quantity,
+              notes: line.notes,
+              isGift: line.isGift ?? false,
+              giftReason: line.giftReason,
+            })),
+          },
+        },
+      });
+    } else if (Object.keys(orderPatch).length > 0) {
+      await prisma.order.update({
+        where: { id: existing.order.id },
+        data: orderPatch,
+      });
+    }
   }
 
   return prisma.transaction.findUniqueOrThrow({

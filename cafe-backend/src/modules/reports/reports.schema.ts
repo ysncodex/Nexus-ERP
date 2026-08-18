@@ -1,4 +1,17 @@
 import { z } from 'zod';
+import { menuCategories } from '../menu/menu.schema.js';
+
+export const productSalesQuerySchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  month: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/, 'month must be in YYYY-MM format')
+    .optional(),
+  category: z.enum(menuCategories).optional(),
+  menuItemId: z.string().optional(),
+  posChannel: z.enum(['in_store', 'takeaway', 'delivery']).optional(),
+});
 
 export const dailyQuerySchema = z.object({
   date: z.string().min(1, 'date is required (YYYY-MM-DD)'),

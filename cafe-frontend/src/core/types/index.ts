@@ -42,8 +42,10 @@ export interface ERPContextType {
 
   /** True while the initial backend sync is in progress. */
   isLoadingTransactions: boolean;
-  /** Re-fetch sales + expenses from the backend. */
-  refreshTransactions: () => Promise<void>;
+  /** Re-fetch sales + expenses from the backend. Pass `{ silent: true }` to
+   * skip the full-page loading flag (used by live dashboards). Also refreshes
+   * authoritative fund balances so drawer figures stay in sync with sales. */
+  refreshTransactions: (opts?: { silent?: boolean }) => Promise<void>;
 
   /** Re-fetch fixed-cost names, product-cost names, and suppliers from the backend. */
   refreshCatalogs: () => Promise<void>;
@@ -131,6 +133,18 @@ export interface DailyRecord {
   totalSales: number;
   /** Net cash flow for the day: totalSales − dailyCosts */
   dailyAvail: number;
+  /** Foodpanda revenue for the day (already included in cash/bkash/bank sales above — this is a channel breakdown, not extra money). */
+  foodpandaSales: number;
+  /** Foodpanda revenue broken down by which payment method it was received through. */
+  foodpandaCash: number;
+  foodpandaBkash: number;
+  foodpandaBank: number;
+  /** Foodi revenue for the day (already included in cash/bkash/bank sales above — this is a channel breakdown, not extra money). */
+  foodiSales: number;
+  /** Foodi revenue broken down by which payment method it was received through. */
+  foodiCash: number;
+  foodiBkash: number;
+  foodiBank: number;
 }
 
 // Re-export types for convenience

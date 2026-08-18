@@ -192,7 +192,7 @@ function AccountBadge({ account }: { account: string }) {
 
 export default function FundManagement() {
   const canMutate = useCanMutate();
-  const { fundMovements, refreshFundMovements } = useERP();
+  const { fundMovements, refreshFundMovements, refreshFundBalances } = useERP();
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>({
@@ -314,6 +314,7 @@ export default function FundManagement() {
         });
 
         await refreshFundMovements();
+        await refreshFundBalances();
         toast.success('Movement recorded successfully');
 
         // This will now work perfectly without TS errors!
@@ -324,7 +325,7 @@ export default function FundManagement() {
         handleError(error, { action: 'add_fund_movement', severity: 'high' });
       }
     },
-    [refreshFundMovements, reset]
+    [refreshFundMovements, refreshFundBalances, reset]
   );
 
   const handleDelete = useCallback(
@@ -334,6 +335,7 @@ export default function FundManagement() {
         try {
           await fundsService.delete(id);
           await refreshFundMovements();
+          await refreshFundBalances();
           toast.success('Record deleted successfully');
         } catch (error) {
           handleError(error, { action: 'delete_fund_movement', severity: 'high' });
@@ -341,7 +343,7 @@ export default function FundManagement() {
       });
       setPasswordModalOpen(true);
     },
-    [refreshFundMovements]
+    [refreshFundMovements, refreshFundBalances]
   );
 
   // Export mapping

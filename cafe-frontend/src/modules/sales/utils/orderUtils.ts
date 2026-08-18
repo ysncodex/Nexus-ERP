@@ -73,8 +73,17 @@ export interface BuildDraftParams {
   tableNumber: string;
   paymentMethod: 'cash' | 'bank' | 'bkash';
   channel: 'in_store' | 'takeaway' | 'delivery';
+  /** Which platform a "Delivery" order belongs to (Foodpanda vs Foodi) —
+   * required for delivery orders so Sales Channel reporting is accurate. */
+  deliveryPlatform?: 'foodpanda' | 'foodi';
   discountType: DiscountType;
   discountValue: number;
+  /**
+   * When resuming/editing an existing pending order, reuse its id + order
+   * number so saving updates the same record instead of creating a new one.
+   */
+  existingId?: string;
+  existingOrderNumber?: string;
 }
 
 export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
@@ -87,13 +96,14 @@ export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
   const now = new Date().toISOString();
 
   return {
-    id: generateId(),
-    orderNumber: formatOrderNumber(),
+    id: params.existingId ?? generateId(),
+    orderNumber: params.existingOrderNumber ?? formatOrderNumber(),
     items: params.items,
     customerName: params.customerName.trim(),
     tableNumber: needsTable ? params.tableNumber : NO_TABLE,
     paymentMethod: params.paymentMethod,
     channel: params.channel,
+    deliveryPlatform: params.channel === 'delivery' ? params.deliveryPlatform ?? 'foodpanda' : undefined,
     subtotal,
     discount,
     discountType: params.discountValue > 0 ? params.discountType : undefined,
@@ -109,8 +119,11 @@ export function buildDraftOrder(params: BuildDraftParams): NewOrderData {
   };
 }
 
-function mapPosChannelToErp(channel: NewOrderData['channel']) {
-  if (channel === 'delivery') return 'foodi' as const;
+function mapPosChannelToErp(
+  channel: NewOrderData['channel'],
+  deliveryPlatform?: NewOrderData['deliveryPlatform']
+) {
+  if (channel === 'delivery') return deliveryPlatform ?? ('foodi' as const);
   return 'in_store' as const;
 }
 
@@ -129,7 +142,7 @@ export function orderToTransaction(
         ? order.items[0].menuItem.name
         : `Order ${order.orderNumber} (${totalItems} items)`,
     ...(status === 'completed' ? { method: order.paymentMethod } : {}),
-    channel: mapPosChannelToErp(order.channel),
+    channel: mapPosChannelToErp(order.channel, order.deliveryPlatform),
     customerName: order.customerName || undefined,
     category: order.items[0]?.menuItem.category,
     quantity: totalItems,
@@ -266,6 +279,13 @@ export function transactionToSaleUpdate(
   };
 }
 
+/** Human-friendly label for a sale/order transaction — falls back to the receipt description. */
+export function orderLabel(t: Pick<Transaction, 'orderNumber' | 'description'>): string {
+  if (t.orderNumber) return t.orderNumber;
+  const match = t.description.match(/BB-\d{8}-\d{4}/);
+  return match ? match[0] : t.description.slice(0, 24) + (t.description.length > 24 ? '…' : '');
+}
+
 export function transactionToOrder(tx: Transaction): NewOrderData | null {
   if (!tx.receiptLines?.length || !tx.orderNumber) return null;
 
@@ -291,6 +311,8 @@ export function transactionToOrder(tx: Transaction): NewOrderData | null {
     tableNumber: tx.tableNumber ?? NO_TABLE,
     paymentMethod: tx.method ?? 'cash',
     channel: tx.posChannel ?? 'in_store',
+    deliveryPlatform:
+      tx.posChannel === 'delivery' ? (tx.channel === 'foodpanda' ? 'foodpanda' : 'foodi') : undefined,
     subtotal:
       tx.subtotal ??
       tx.receiptLines.reduce((s, l) => s + l.qty * l.unitPrice, 0) + (tx.discountAmount ?? 0),

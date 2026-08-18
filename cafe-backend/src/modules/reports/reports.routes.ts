@@ -6,6 +6,7 @@ import {
   dailyReport,
   exportReport,
   monthlyReport,
+  productSalesReport,
   profitLossReport,
 } from './reports.controller.js';
 
@@ -17,6 +18,7 @@ router.get('/daily', asyncHandler(dailyReport));
 router.get('/monthly', asyncHandler(monthlyReport));
 router.get('/profit-loss', asyncHandler(profitLossReport));
 router.get('/custom', asyncHandler(customReport));
+router.get('/product-sales', asyncHandler(productSalesReport));
 router.get('/export', asyncHandler(exportReport));
 
 export default router;

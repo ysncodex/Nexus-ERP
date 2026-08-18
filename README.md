@@ -58,7 +58,6 @@ Helpers live in `cafe-frontend/src/shared/utils/businessDate.ts` and `cafe-backe
 | ---- | ------ |
 | **Owner** | Full access |
 | **Manager** | Operations + manager PIN for sensitive edits |
-| **Visitor** | Read-only preview (no password) |
 
 Passwords are **never stored in source code**. Set them in environment variables:
 
@@ -67,7 +66,7 @@ Passwords are **never stored in source code**. Set them in environment variables
 | Backend `.env` | `OWNER_PASSWORD`, `MANAGER_PASSWORD` (used by `npm run db:seed`) |
 | Frontend `.env` | `VITE_OWNER_PASSWORD`, `VITE_MANAGER_PASSWORD` (optional offline fallback) |
 
-Production sign-in uses JWT from the backend API. Visitor mode uses `POST /api/auth/visitor`.
+Production sign-in uses JWT from the backend API.
 
 ---
 

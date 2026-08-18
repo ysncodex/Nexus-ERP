@@ -1,4 +1,5 @@
 import { api } from '../client';
+import type { MenuCategory } from '@/modules/sales/types/menuItem.types';
 
 // Type definitions for reports
 export interface DailyReport {
@@ -54,6 +55,45 @@ export interface ProfitLossReport {
   };
 }
 
+export interface ProductSalesRow {
+  menuItemId?: string;
+  name: string;
+  category: string;
+  qtySold: number;
+  qtyGifted: number;
+  revenue: number;
+  avgSellingPrice: number;
+  percentOfTotalRevenue: number;
+}
+
+export interface ProductSalesSummaryEntry {
+  name: string;
+  qtySold: number;
+  revenue: number;
+}
+
+export interface ProductSalesReport {
+  period: { startDate?: string; endDate?: string };
+  summary: {
+    totalProducts: number;
+    totalUnitsSold: number;
+    totalRevenue: number;
+    bestSellingProduct: ProductSalesSummaryEntry | null;
+    lowestSellingProduct: ProductSalesSummaryEntry | null;
+  };
+  products: ProductSalesRow[];
+}
+
+export interface ProductSalesQuery {
+  startDate?: string;
+  endDate?: string;
+  month?: string;
+  category?: MenuCategory;
+  menuItemId?: string;
+  posChannel?: 'in_store' | 'takeaway' | 'delivery';
+  [key: string]: unknown;
+}
+
 // Reports Service
 export const reportsService = {
   // Get daily report
@@ -80,6 +120,11 @@ export const reportsService = {
     endDate: string;
   }): Promise<unknown> => {
     return api.get('/reports/custom', params);
+  },
+
+  // Get individual product sales analysis (by month/range, category, product, order type)
+  getProductSalesReport: async (params?: ProductSalesQuery): Promise<ProductSalesReport> => {
+    return api.get<ProductSalesReport>('/reports/product-sales', params);
   },
 
   // Export report to PDF/Excel

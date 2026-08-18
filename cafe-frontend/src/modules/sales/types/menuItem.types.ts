@@ -97,6 +97,9 @@ export interface NewOrderData {
   tableNumber: string;
   paymentMethod: 'cash' | 'bank' | 'bkash';
   channel: 'in_store' | 'takeaway' | 'delivery';
+  /** Which platform a "Delivery" order came from — decides whether it's
+   * reported as Foodpanda or Foodi revenue (channel alone can't tell). */
+  deliveryPlatform?: 'foodpanda' | 'foodi';
   subtotal: number;
   discount: number;
   /** How the discount was entered (flat amount vs percentage). */

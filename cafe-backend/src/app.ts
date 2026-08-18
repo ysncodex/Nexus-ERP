@@ -11,6 +11,7 @@ import reportsRoutes from './modules/reports/reports.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import suppliersRoutes from './modules/suppliers/suppliers.routes.js';
 import fundsRoutes from './modules/funds/funds.routes.js';
+import deliverySettlementsRoutes from './modules/deliverySettlements/deliverySettlements.routes.js';
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp() {
   app.use('/api/menu', menuRoutes);
   app.use('/api/suppliers', suppliersRoutes);
   app.use('/api/funds', fundsRoutes);
+  app.use('/api/delivery-settlements', deliverySettlementsRoutes);
 
   // ── Fallbacks ──────────────────────────────────────────────────────────────
   app.use(notFound);

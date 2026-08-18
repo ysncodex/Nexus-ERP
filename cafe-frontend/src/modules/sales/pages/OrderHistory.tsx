@@ -27,12 +27,12 @@ import {
   ChevronDown as ChevronDownIcon,
   AlertTriangle,
   UtensilsCrossed,
-  Loader2,
   Gift,
   Trophy,
   type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 import { salesService } from '@/core/api/services';
 import { useERP } from '@/core/context/useERP';
 import {
@@ -65,9 +65,9 @@ import {
   transactionToOrder,
   transactionToSaleUpdate,
   resolveOrderTimestamp,
+  orderLabel,
 } from '../utils/orderUtils';
-import { PaymentPanel } from '../components/PaymentPanel';
-import type { NewOrderData } from '../types/menuItem.types';
+import { PendingPaymentModal } from '../components/PendingPaymentModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -141,6 +141,23 @@ function statusOf(t: Transaction): ReceiptStatus {
   return t.receiptStatus ?? 'completed';
 }
 
+/**
+ * A "real" POS invoice has line items + an order number, so its cart can be
+ * rebuilt on the New Order page for editing. Ad-hoc entries (quick sales,
+ * expenses, delivery settlement postings) have no items — those stay on the
+ * simple field-editor modal. Refunded/voided invoices also stay on the modal
+ * since there's no meaningful "re-print & update" flow for them.
+ */
+function isEditableInvoice(t: Transaction): boolean {
+  const status = statusOf(t);
+  return (
+    t.type === 'sale' &&
+    Boolean(t.orderNumber) &&
+    Boolean(t.receiptLines?.length) &&
+    (status === 'pending' || status === 'completed')
+  );
+}
+
 function itemCount(t: Transaction): number {
   if (t.receiptLines && t.receiptLines.length > 0)
     return t.receiptLines.reduce((s, r) => s + r.qty, 0);
@@ -170,12 +187,6 @@ function findTopOrderId(rows: Transaction[]): string | null {
     }
   }
   return top.id;
-}
-
-function orderLabel(t: Transaction): string {
-  if (t.orderNumber) return t.orderNumber;
-  const match = t.description.match(/BB-\d{8}-\d{4}/);
-  return match ? match[0] : t.description.slice(0, 24) + (t.description.length > 24 ? '…' : '');
 }
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
@@ -331,156 +342,6 @@ function RevenueKpiCard({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Pending Payment Modal ────────────────────────────────────────────────────
-
-function PendingPaymentModal({
-  tx,
-  onClose,
-  onComplete,
-}: {
-  tx: Transaction;
-  onClose: () => void;
-  onComplete: (
-    updated: Transaction,
-    payment: { method: PaymentMethod; customerPaid: number; changeAmount: number }
-  ) => void;
-}) {
-  const baseOrder = useMemo(() => transactionToOrder(tx), [tx]);
-  const [customerPaidStr, setCustomerPaidStr] = useState(() =>
-    String(tx.customerPaid ?? tx.amount)
-  );
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(tx.method ?? 'cash');
-  const [printing, setPrinting] = useState(false);
-
-  if (!baseOrder) {
-    return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
-          <p className="text-sm text-slate-600 mb-4">
-            This order cannot be opened for payment — line items are missing.
-          </p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-semibold"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const paid = parseFloat(customerPaidStr) || 0;
-  const change = Math.max(0, paid - tx.amount);
-  const paymentOk = paid >= tx.amount;
-
-  const finalize = async (withPrint: boolean) => {
-    if (!paymentOk) {
-      toast.error(`Customer must pay at least ৳${tx.amount}`);
-      return;
-    }
-    const enriched: NewOrderData = {
-      ...baseOrder,
-      paymentMethod,
-      customerPaid: paid,
-      changeAmount: change,
-    };
-    if (withPrint) {
-      setPrinting(true);
-      try {
-        const ok = await printOrderAsync(enriched, 'customer');
-        if (!ok) {
-          toast.error('Pop-up blocked — allow pop-ups and retry');
-          return;
-        }
-      } finally {
-        setPrinting(false);
-      }
-    }
-    onComplete(
-      { ...tx, receiptStatus: 'completed', method: paymentMethod },
-      { method: paymentMethod, customerPaid: paid, changeAmount: change }
-    );
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden">
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 px-5 pt-5 pb-4 text-white shrink-0">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-base font-bold">Receive Payment</h2>
-              <p className="text-xs opacity-90 mt-0.5">
-                {orderLabel(tx)} · ৳{tx.amount}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-2">
-              Payment Method
-            </p>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(['cash', 'bank', 'bkash'] as PaymentMethod[]).map((m) => {
-                const cfg = METHOD_CONFIG[m];
-                const Icon = cfg.icon;
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setPaymentMethod(m)}
-                    className={`py-2.5 rounded-xl text-xs font-bold border flex flex-col items-center gap-1 transition-all ${
-                      paymentMethod === m
-                        ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    <Icon size={14} className={cfg.color} />
-                    {cfg.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <PaymentPanel
-            billTotal={tx.amount}
-            paymentMethod={paymentMethod}
-            customerPaidStr={customerPaidStr}
-            onPaidChange={setCustomerPaidStr}
-            discountAmount={tx.discountAmount}
-          />
-        </div>
-        <div className="p-4 border-t border-slate-100 space-y-2 shrink-0">
-          <button
-            type="button"
-            disabled={printing || !paymentOk}
-            onClick={() => void finalize(true)}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm disabled:opacity-50"
-          >
-            {printing ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
-            Print Receipt & Complete
-          </button>
-          <button
-            type="button"
-            disabled={printing || !paymentOk}
-            onClick={() => void finalize(false)}
-            className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold text-sm disabled:opacity-50"
-          >
-            Complete Without Print
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -852,6 +713,7 @@ function SortBtn({
 export default function OrderHistory() {
   const canMutate = useCanMutate();
   const isOwner = getStoredUser()?.role === 'owner'; // Added check
+  const navigate = useNavigate();
 
   const {
     itemNames,
@@ -909,6 +771,20 @@ export default function OrderHistory() {
   const [pendingDelete, setPendingDelete] = useState<Transaction | null>(null);
   const [payingOrder, setPayingOrder] = useState<Transaction | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  /** POS invoices go to the New Order page for a real cart-editing experience;
+   * everything else (quick sales, expenses, settlement postings) keeps the
+   * simple field-editor modal. */
+  const openEdit = useCallback(
+    (tx: Transaction) => {
+      if (isEditableInvoice(tx)) {
+        navigate(`/dashboard/new-order?editOrder=${tx.id}`);
+        return;
+      }
+      setEditing(tx);
+    },
+    [navigate]
+  );
 
   // ── Extract sale transactions ──
   const allSales = useMemo(() => transactions.filter((t) => t.type === 'sale'), [transactions]);
@@ -1525,9 +1401,7 @@ export default function OrderHistory() {
                           <>
                             <button
                               type="button"
-                              onClick={() => {
-                                setEditing(tx);
-                              }}
+                              onClick={() => openEdit(tx)}
                               title="Edit"
                               className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all"
                             >
@@ -1563,9 +1437,7 @@ export default function OrderHistory() {
         <DetailDrawer
           tx={viewing}
           onClose={() => setViewing(null)}
-          onEdit={() => {
-            setEditing(viewing);
-          }}
+          onEdit={() => openEdit(viewing)}
           onDelete={() => requestDelete(viewing)}
           onReceivePayment={() => setPayingOrder(viewing)}
           canMutate={canMutate}

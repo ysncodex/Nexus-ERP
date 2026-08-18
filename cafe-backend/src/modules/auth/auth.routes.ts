@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { loginController, verifyController, visitorController } from './auth.controller.js';
+import { loginController, verifyController } from './auth.controller.js';
 import { authenticate } from '../../middleware/auth.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
@@ -16,7 +16,6 @@ const loginLimiter = rateLimit({
 });
 
 router.post('/login', loginLimiter, asyncHandler(loginController));
-router.post('/visitor', asyncHandler(visitorController));
 router.get('/verify', authenticate, asyncHandler(verifyController));
 
 export default router;

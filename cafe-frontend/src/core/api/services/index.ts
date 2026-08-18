@@ -7,13 +7,23 @@ export { menuService } from './menu.service';
 export { catalogService } from './catalog.service';
 export { suppliersService } from './suppliers.service';
 export { fundsService } from './funds.service';
+export { deliverySettlementsService } from './deliverySettlements.service';
+export type { DeliverySettlementUpdateData } from './deliverySettlements.service';
 
 // Re-export types
 export type { LoginCredentials, AuthResponse, AuthRole, User } from './auth.service';
 export type { SaleCreateData, SaleUpdateData, SalesStats } from './sales.service';
 export type { MenuItemCreateData, MenuItemUpdateData } from './menu.service';
 export type { ExpenseCreateData, ExpenseStats } from './expenses.service';
-export type { DailyReport, MonthlyReport, ProfitLossReport } from './reports.service';
+export type {
+  DailyReport,
+  MonthlyReport,
+  ProfitLossReport,
+  ProductSalesReport,
+  ProductSalesRow,
+  ProductSalesSummaryEntry,
+  ProductSalesQuery,
+} from './reports.service';
 export type { CatalogItem } from './catalog.service';
 export type { Supplier, SupplierCreateData, SupplierUpdateData } from './suppliers.service';
 export type { FundMovementCreateData } from '@/core/types/fund.types';
