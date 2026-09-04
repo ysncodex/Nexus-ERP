@@ -17,7 +17,6 @@ function resolveOrderLines(
   data: Pick<SaleCreateInput, 'orderItems' | 'receiptLines'>
 ): OrderItemInput[] {
   if (data.orderItems?.length) return data.orderItems;
-
   if (!data.receiptLines?.length) return [];
 
   return data.receiptLines.map((line: ReceiptLineInput) => ({
@@ -53,10 +52,6 @@ function buildTransactionData(data: SaleCreateInput) {
     description: data.description ?? '',
     date: resolveTransactionDate(data.date),
     orderNumber: data.orderNumber,
-    // Any sale that isn't explicitly "pending" is completed — including Quick Record
-    // Sale entries that have no orderNumber. Previously only POS orders (with
-    // orderNumber) got receiptStatus='completed'; quick sales were saved as NULL
-    // and excluded from /api/funds/balances cash drawer totals.
     receiptStatus: data.receiptStatus ?? (pending ? undefined : ('completed' as const)),
     posChannel: data.posChannel,
     customerName: data.customerName,
@@ -133,25 +128,102 @@ function buildLinkedOrderUpdate(data: SaleUpdateInput) {
   return patch;
 }
 
-/** Create sale + optional POS order without interactive transactions (Neon-safe). */
+/**
+ * Automatically synchronizes a 1.30% bank fee expense transaction
+ * linked to the original POS sale whenever it completes via 'bank'.
+ */
+async function syncPosBankFee(
+  saleId: string,
+  orderNumber: string | null | undefined,
+  method: string | null | undefined,
+  status: string | null | undefined,
+  amount: number | any,
+  date: Date | string,
+  channel: string | null | undefined
+) {
+  // 🛡️ SAFEGUARD: Ignore Foodpanda and Foodi completely.
+  if (channel === 'foodpanda' || channel === 'foodi') {
+    return;
+  }
+
+  const ref = orderNumber ? `Order ${orderNumber}` : `ID ${saleId.slice(-6)}`;
+  const feeDesc = `POS Card Fee (1.30%) - Ref: ${ref}`;
+
+  const existingFeeTx = await prisma.transaction.findFirst({
+    where: { type: 'expense_fixed', description: feeDesc },
+  });
+
+  if (method === 'bank' && status === 'completed') {
+    // 🎯 PRECISION FIX: Force exact 2-decimal rounding before Prisma saves it
+    const feeAmount = Math.round(Number(amount) * 0.013 * 100) / 100;
+
+    // 📡 OFFLINE FIX: Inherit the exact sale date to prevent time-drift during offline syncs
+    const txDate = new Date(date);
+
+    if (existingFeeTx) {
+      await prisma.transaction.update({
+        where: { id: existingFeeTx.id },
+        data: {
+          amount: feeAmount,
+          date: txDate,
+          fixedCostRecord: { update: { amount: feeAmount, date: txDate } },
+        },
+      });
+    } else {
+      await prisma.transaction.create({
+        data: {
+          type: 'expense_fixed',
+          method: 'bank',
+          amount: feeAmount,
+          category: 'Bank Fees',
+          description: feeDesc,
+          date: txDate,
+          fixedCostRecord: {
+            create: {
+              nameSnapshot: 'POS Bank Fee',
+              description: 'Automatic 1.30% POS transaction fee',
+              amount: feeAmount,
+              paymentMethod: 'bank',
+              date: txDate,
+            },
+          },
+        },
+      });
+    }
+  } else if (existingFeeTx) {
+    await prisma.transaction.delete({ where: { id: existingFeeTx.id } });
+  }
+}
+
 export async function createSaleRecord(data: SaleCreateInput) {
   const orderLines = resolveOrderLines(data);
+  let sale;
 
   if (!isPosOrder(data)) {
-    return prisma.transaction.create({ data: buildTransactionData(data) });
+    sale = await prisma.transaction.create({ data: buildTransactionData(data) });
+  } else {
+    sale = await prisma.transaction.create({ data: buildTransactionData(data) });
+    try {
+      await prisma.order.create({
+        data: buildOrderData(data, orderLines, sale.id),
+      });
+    } catch (err) {
+      await prisma.order.deleteMany({ where: { saleTransactionId: sale.id } }).catch(() => {});
+      await prisma.transaction.delete({ where: { id: sale.id } }).catch(() => {});
+      throw err;
+    }
   }
 
-  const sale = await prisma.transaction.create({ data: buildTransactionData(data) });
-
-  try {
-    await prisma.order.create({
-      data: buildOrderData(data, orderLines, sale.id),
-    });
-  } catch (err) {
-    await prisma.order.deleteMany({ where: { saleTransactionId: sale.id } }).catch(() => {});
-    await prisma.transaction.delete({ where: { id: sale.id } }).catch(() => {});
-    throw err;
-  }
+  // Deduct POS 1.30% Fee immediately if it's a completed bank payment (excluding Foodpanda/Foodi)
+  await syncPosBankFee(
+    sale.id,
+    sale.orderNumber,
+    sale.method,
+    sale.receiptStatus,
+    sale.amount,
+    sale.date,
+    sale.channel
+  );
 
   return prisma.transaction.findUniqueOrThrow({
     where: { id: sale.id },
@@ -232,9 +304,6 @@ export async function updateSaleRecord(id: string, data: SaleUpdateInput) {
 
   const orderPatch = buildLinkedOrderUpdate(data);
   if (existing.order) {
-    // Editing a pending order's cart (New Order → resume & edit) sends a fresh
-    // orderItems array. Replace the relational line items to match — the create
-    // path already builds them the same way, so re-use that shape here.
     if (data.orderItems !== undefined) {
       const lines = resolveOrderLines(data);
       const subtotal = data.subtotal ?? computeSubtotal(lines);
@@ -266,6 +335,18 @@ export async function updateSaleRecord(id: string, data: SaleUpdateInput) {
     }
   }
 
+  // Adjust POS 1.30% Fee if payment methods or amounts changed during update (excluding Foodpanda/Foodi)
+  const updatedSale = await prisma.transaction.findUniqueOrThrow({ where: { id } });
+  await syncPosBankFee(
+    updatedSale.id,
+    updatedSale.orderNumber,
+    updatedSale.method,
+    updatedSale.receiptStatus,
+    updatedSale.amount,
+    updatedSale.date,
+    updatedSale.channel
+  );
+
   return prisma.transaction.findUniqueOrThrow({
     where: { id },
     include: { order: true },
@@ -275,6 +356,11 @@ export async function updateSaleRecord(id: string, data: SaleUpdateInput) {
 export async function deleteSaleRecord(id: string) {
   const existing = await prisma.transaction.findUnique({ where: { id } });
   if (!existing) throw ApiError.notFound('Sale not found');
+
+  // Match the new description format to clean up the linked fee
+  const ref = existing.orderNumber ? `Order ${existing.orderNumber}` : `ID ${id.slice(-6)}`;
+  const feeDesc = `POS Card Fee (1.30%) - Ref: ${ref}`;
+  await prisma.transaction.deleteMany({ where: { description: feeDesc } });
 
   await prisma.order.deleteMany({ where: { saleTransactionId: id } });
   await prisma.transaction.delete({ where: { id } });

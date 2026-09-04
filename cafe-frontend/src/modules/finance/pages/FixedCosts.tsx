@@ -349,9 +349,14 @@ export default function FixedCosts() {
   const categoryBreakdown = useMemo(() => {
     const breakdownMap = new Map<string, number>();
     filteredExpenses.forEach((t) => {
-      const current = breakdownMap.get(t.description) || 0;
-      breakdownMap.set(t.description, current + t.amount);
+      // 🎯 FIX: Group by actual Category first. If empty, fallback to Description.
+      // This merges all individual POS Card Fees into a single "Bank Fees" row.
+      const groupName = t.category ? t.category : t.description;
+
+      const current = breakdownMap.get(groupName) || 0;
+      breakdownMap.set(groupName, current + t.amount);
     });
+
     return Array.from(breakdownMap.entries())
       .map(([name, amount]) => ({ name, amount }))
       .sort((a, b) => b.amount - a.amount);
