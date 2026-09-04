@@ -32,11 +32,16 @@ export function PaymentPanel({
   discountAmount,
 }: PaymentPanelProps) {
   const isCash = isCashMethod(paymentMethod);
+  const isBank = paymentMethod === 'bank';
   const inputRef = useRef<HTMLInputElement>(null);
   const paid = parseFloat(customerPaidStr) || 0;
   const change = Math.max(0, paid - billTotal);
   const insufficient = isCash && paid > 0 && paid < billTotal;
   const billRounded = Math.round(billTotal);
+
+  // Accounting splits for visual confidence (Matching DB Precision)
+  const bankFee = isBank ? Math.round(billTotal * 0.013 * 100) / 100 : 0;
+  const netSettlement = isBank ? billTotal - bankFee : billTotal;
 
   const quickButtons = useMemo(() => {
     const buttons: { key: string; label: string; value: number }[] = [
@@ -73,10 +78,29 @@ export function PaymentPanel({
           Total Bill
         </p>
         <p className="text-4xl font-black tracking-tight tabular-nums">৳{billRounded}</p>
+
         {discountAmount != null && discountAmount > 0 && (
           <p className="text-xs text-slate-300 mt-1">Includes ৳{discountAmount} discount</p>
         )}
-        <p className="text-xs text-slate-400 mt-2 font-medium">
+
+        {isBank && (
+          <div className="mt-4 bg-slate-900/60 rounded-xl p-3.5 text-left border border-slate-700/50 shadow-inner">
+            <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+              <span>Gross Revenue</span>
+              <span>৳{billTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-rose-400/90 mb-2.5 pb-2.5 border-b border-slate-700/50">
+              <span>Bank Fee (1.30%)</span>
+              <span>- ৳{bankFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-emerald-400">
+              <span>Net Settlement</span>
+              <span>৳{netSettlement.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs text-slate-400 mt-3 font-medium">
           {PAYMENT_LABELS[paymentMethod]}
           {channelLabel ? ` · ${channelLabel}` : ''}
         </p>
