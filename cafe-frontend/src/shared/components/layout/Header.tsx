@@ -1,132 +1,123 @@
-import { Menu, Calendar, UserCircle2 } from 'lucide-react';
+import { Calendar, Menu, UserCircle2 } from 'lucide-react';
 import type { HeaderProps } from './Layout.types';
 import { getUserDisplayName, getUserRole, ROLE_LABELS } from '@/shared/utils';
 
+const PAGE_TITLES: Record<string, string> = {
+  dashboard: 'Dashboard',
+  manager_dashboard: 'Manager Dashboard',
+  daily_record: 'Daily Summary',
+  report: 'Financial Report',
+  product_sales: 'Product Sales',
+  daily_expense: 'All Expenses',
+  product_cost: 'Purchases',
+  consumables: 'Consumables & Packaging',
+  fixed_cost: 'Fixed Expenses',
+  fund: 'Cash & Accounts',
+  delivery_settlement: 'Delivery Payouts',
+  pos_sync: 'Sales Sync',
+  daily_sales: 'Daily Sales',
+  invoices: 'Invoices',
+  new_order: 'New Order',
+  order_history: 'Order History',
+  product_list: 'Products',
+  stock_levels: 'Stock Levels',
+  suppliers: 'Suppliers',
+  wastage: 'Wastage',
+  staff_roster: 'Staff Schedule',
+  payroll: 'Payroll',
+};
+
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  dashboard: 'Overview of key financial metrics and recent activities',
+  manager_dashboard: "Today's sales, orders, expenses, and drawer balances",
+  report: 'Review revenue, expenses, and profit for the selected period',
+  product_sales: 'Review product performance across the selected period',
+  daily_expense: 'Review fixed expenses, purchases, and consumables for the month',
+  daily_record: 'Day-by-day sales, expenses, and result',
+  fixed_cost: 'Record rent, salaries, utilities, and other fixed expenses',
+  fund: 'Move money between cash, bKash, bank, and reserve',
+  product_cost: 'Record supplier purchases and review item totals',
+  consumables: 'Record cups, lids, bags, boxes, napkins, straws, and other packing supplies, separate from ingredient purchases and fixed expenses',
+  delivery_settlement: 'Review delivery platform statements, deductions, and deposits',
+  pos_sync: 'Finish uploaded sales, offline receipts, and delivery-app connections',
+  daily_sales: 'Track sales performance across all channels',
+  invoices: 'Generate and manage invoices for customers and vendors',
+  new_order: 'Create a café order and collect payment',
+  order_history: 'Search and review previous orders',
+  product_list: 'Manage products, prices, and availability',
+  stock_levels: 'Monitor inventory across storage locations',
+  suppliers: 'Manage supplier contacts and purchase details',
+  wastage: 'Log and review spoilage and inventory wastage',
+  staff_roster: 'Plan employee shifts, schedules, and attendance',
+  payroll: 'Review staff salaries, bonuses, and deductions',
+};
+
+function formatPageTitle(tab: string) {
+  return (
+    PAGE_TITLES[tab] ??
+    tab
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+  );
+}
+
 export function Header({ activeTab, onMobileMenuToggle }: HeaderProps) {
-  const currentDate = new Date().toLocaleDateString('en-US', {
+  const currentDate = new Intl.DateTimeFormat('en-BD', {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
-  });
-
-  const getPageTitle = (tab: string) => {
-    const titles: Record<string, string> = {
-      // Main
-      dashboard:         'Dashboard',
-      manager_dashboard: 'Manager Dashboard',
-      daily_record:      'All Records',
-      report:       'Analytics',
-      // Operations
-      daily_expense: 'Daily Expenses',
-      product_cost:  'Product Costs',
-      fixed_cost:    'Fixed Costs',
-      fund:          'Fund Management',
-      // Revenue
-      pos_sync:    'POS Sync',
-      daily_sales: 'Daily Sales',
-      invoices:    'Invoices',
-      // Inventory
-      stock_levels: 'Stock Levels',
-      suppliers:    'Suppliers',
-      wastage:      'Wastage',
-      // Workforce
-      staff_roster: 'Staff Roster',
-      payroll:      'Payroll',
-    };
-    return titles[tab] ?? tab.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  };
-
-  const getPageDescription = (tab: string) => {
-    const descriptions: Record<string, string> = {
-      // Main
-      // Overview
-      dashboard:         'Overview of key financial metrics and recent activities',
-      manager_dashboard: "Live shift overview — sales, orders, drawer balances, and quick entry",
-      report:            'Generate comprehensive financial reports and analytics',
-      // Finance
-      daily_expense: 'Track daily operational expenses',
-      daily_record:  'Browse and search all transaction records by date range',
-      fixed_cost:    'Monitor and manage recurring fixed expenses',
-      fund:          'Manage fund additions and withdrawals',
-      // Inventory
-      product_cost:  'Manage product costs and variable inventory expenses',
-      // Revenue
-      pos_sync:    'Sync and reconcile point-of-sale transactions in real time',
-      daily_sales: 'Track and analyse daily sales performance across all channels',
-      invoices:    'Generate, send, and manage invoices for customers and vendors',
-      // Inventory
-      stock_levels: 'Monitor ingredient and product inventory across all storage locations',
-      suppliers:    'Manage supplier contacts, purchase orders, and delivery schedules',
-      wastage:      'Log and review spoilage and wastage to reduce inventory losses',
-      // Workforce
-      staff_roster: 'Plan and manage employee shifts, schedules, and attendance',
-      payroll:      'Calculate and process staff salaries, bonuses, and deductions',
-    };
-    return descriptions[tab] ?? 'Café ERP Management System';
-  };
-
+    day: 'numeric',
+  }).format(new Date());
   const userName = getUserDisplayName();
   const userRole = getUserRole();
-  const roleLabel = userRole ? ROLE_LABELS[userRole] : null;
-
+  const roleLabel = userRole ? ROLE_LABELS[userRole] : 'Active';
   const roleBadgeClass =
-    userRole === 'owner' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+    userRole === 'owner'
+      ? 'border-amber-200 bg-amber-50 text-amber-800'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-800';
 
   return (
-    <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
-      <div className="px-4 py-3 md:px-5 md:py-4 lg:px-6 xl:px-8">
-        <div className="flex items-center justify-between">
-          {/* Left Section: Title and Description */}
-          <div className="flex items-center gap-3 flex-1">
-            <button
-              onClick={onMobileMenuToggle}
-              className="md:hidden p-2 -ml-2 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
-              aria-label="Toggle menu"
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-sm shadow-slate-900/[0.03] backdrop-blur-xl">
+      <div className="flex min-h-[68px] items-center gap-3 px-4 py-2.5 sm:px-5 lg:px-7">
+        <button
+          type="button"
+          onClick={onMobileMenuToggle}
+          className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 md:hidden"
+          aria-label="Open navigation menu"
+        >
+          <Menu size={21} aria-hidden="true" />
+        </button>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h1 className="text-base font-bold tracking-tight text-slate-900 sm:text-lg">
+              {formatPageTitle(activeTab)}
+            </h1>
+            <span
+              className={`hidden shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold leading-none md:inline-flex ${roleBadgeClass}`}
             >
-              <Menu size={24} />
-            </button>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                <h1 className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold text-slate-900 tracking-tight truncate">
-                  {getPageTitle(activeTab)}
-                </h1>
-                <span className={`hidden md:inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full ${roleBadgeClass}`}>
-                  {roleLabel ?? 'Active'}
-                </span>
-              </div>
-              <p className="text-xs lg:text-sm text-slate-500 mt-1 hidden lg:block">
-                {getPageDescription(activeTab)}
-              </p>
-            </div>
+              {roleLabel}
+            </span>
           </div>
-
-          {/* Right Section: Date and User */}
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="hidden lg:flex items-center gap-2 text-sm text-slate-700 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
-              <UserCircle2 size={18} className="text-slate-400" />
-              <span className="font-semibold">{userName}</span>
-            </div>
-            <div className="hidden lg:flex items-center gap-2 text-sm text-slate-600 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
-              <Calendar size={16} className="text-slate-400" />
-              <span className="font-medium">{currentDate}</span>
-            </div>
-          </div>
+          <p className="mt-0.5 hidden max-w-2xl text-xs leading-relaxed text-erp-secondary lg:block">
+            {PAGE_DESCRIPTIONS[activeTab] ?? 'Café ERP Management System'}
+          </p>
         </div>
 
-        {/* Compact date/user row — phones through small laptops (below lg) */}
-        <div className="lg:hidden mt-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Calendar size={14} className="text-slate-400" />
-            <span>{currentDate}</span>
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <div className="flex h-10 max-w-[180px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <UserCircle2 size={16} className="shrink-0 text-slate-400" aria-hidden="true" />
+            <span className="truncate font-medium">{userName}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-              <UserCircle2 size={14} className="text-slate-400" />
-              <span className="font-semibold">{userName}</span>
-            </div>
+          <div className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs font-medium text-slate-600 md:flex">
+            <Calendar size={15} className="shrink-0 text-slate-400" aria-hidden="true" />
+            <time>{currentDate}</time>
           </div>
+        </div>
+        <div className="flex h-9 shrink-0 items-center gap-1.5 text-[11px] font-medium text-slate-600 sm:hidden">
+          <Calendar size={14} className="text-slate-400" aria-hidden="true" />
+          <time>{currentDate}</time>
         </div>
       </div>
     </header>

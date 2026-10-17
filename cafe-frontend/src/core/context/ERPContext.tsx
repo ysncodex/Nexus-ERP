@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import type {
   Transaction,
@@ -13,6 +14,7 @@ import type {
 } from '@/core/types';
 import { generateId, STORAGE_KEYS, blockReadOnlyMutation, isAuthenticated } from '@/shared/utils';
 import { businessTodayDateRange, todayBusinessKey } from '@/shared/utils/businessDate';
+import { isLedgerExpense } from '@/core/types/transaction.types';
 
 import { savePersistedERPState } from './erp/storage';
 import { normalizeLabel } from './erp/listUtils';
@@ -65,24 +67,35 @@ export function ERPProvider({ children }: { children: ReactNode }) {
 
   const [fixedCostItems, setFixedCostItems] = useState<CatalogItem[]>([]);
   const [productCostItems, setProductCostItems] = useState<CatalogItem[]>([]);
+  const [consumableGroups, setConsumableGroups] = useState<CatalogItem[]>([]);
+  const [consumableItems, setConsumableItems] = useState<CatalogItem[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   const refreshCatalogs = useCallback(async () => {
     if (!isAuthenticated()) {
       setFixedCostItems([]);
       setProductCostItems([]);
+      setConsumableGroups([]);
+      setConsumableItems([]);
       setSuppliers([]);
       return;
     }
 
     try {
-      const [fixedItems, productItems, supplierRows] = await Promise.all([
-        catalogService.getFixedItems(),
-        catalogService.getProductItems(),
-        suppliersService.getAll(),
-      ]);
+      const [fixedItems, productItems, supplierRows, consumableGroupRows, consumableRows] =
+        await Promise.all([
+          catalogService.getFixedItems(),
+          catalogService.getProductItems(),
+          suppliersService.getAll(),
+          // These two 404 before the Consumables & Packaging migration is
+          // deployed; swallow so the rest of the catalogs still load.
+          catalogService.getConsumableGroups().catch(() => [] as CatalogItem[]),
+          catalogService.getConsumableItems().catch(() => [] as CatalogItem[]),
+        ]);
       setFixedCostItems(fixedItems);
       setProductCostItems(productItems);
+      setConsumableGroups(consumableGroupRows);
+      setConsumableItems(consumableRows);
       setSuppliers(supplierRows);
     } catch {
       toast.error('Could not load expense catalogs from server');
@@ -208,14 +221,19 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       void createTransactionOnServer(data)
         .then((saved) => {
           setTransactions((prev) => prev.map((t) => (t.id === optimistic.id ? saved : t)));
-          if (saved.type === 'expense_fixed' || saved.type === 'expense_product') {
+          if (isLedgerExpense(saved.type)) {
             void refreshCatalogs();
           }
           void refreshFundBalances();
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           setTransactions((prev) => prev.filter((t) => t.id !== optimistic.id));
-          toast.error('Failed to save transaction');
+          // Surface the server's reason (e.g. insufficient funds) instead of a
+          // generic failure, so the user knows what to change.
+          const serverMessage = isAxiosError<{ message?: string }>(error)
+            ? error.response?.data?.message
+            : undefined;
+          toast.error(serverMessage || 'Failed to save transaction');
         });
 
       return optimistic;
@@ -255,11 +273,14 @@ export function ERPProvider({ children }: { children: ReactNode }) {
           setTransactions((p) => p.map((t) => (t.id === saved.id ? saved : t)));
           void refreshFundBalances();
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (previous) {
             setTransactions((p) => p.map((t) => (t.id === previous.id ? previous : t)));
           }
-          toast.error('Failed to update transaction');
+          const serverMessage = isAxiosError<{ message?: string }>(error)
+            ? error.response?.data?.message
+            : undefined;
+          toast.error(serverMessage || 'Failed to update transaction');
         });
       return prev.map((t) => (t.id === updated.id ? updated : t));
     });
@@ -279,6 +300,14 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     (name: string) => productCostItems.find((i) => i.name.toLowerCase() === name.toLowerCase()),
     [productCostItems]
   );
+  const findConsumableByName = useCallback(
+    (name: string) => consumableItems.find((i) => i.name.toLowerCase() === name.toLowerCase()),
+    [consumableItems]
+  );
+  const findConsumableGroupByName = useCallback(
+    (name: string) => consumableGroups.find((g) => g.name.toLowerCase() === name.toLowerCase()),
+    [consumableGroups]
+  );
   const findSupplierByName = useCallback(
     (name: string) => suppliers.find((s) => s.name.toLowerCase() === name.toLowerCase()),
     [suppliers]
@@ -290,6 +319,28 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       const v = normalizeLabel(name);
       if (!v) return;
       await catalogService.createFixedItem(v);
+      await refreshCatalogs();
+    },
+    [refreshCatalogs]
+  );
+
+  const addConsumableGroup = useCallback(
+    async (name: string) => {
+      if (blockReadOnlyMutation()) return;
+      const v = normalizeLabel(name);
+      if (!v) return;
+      await catalogService.createConsumableGroup(v);
+      await refreshCatalogs();
+    },
+    [refreshCatalogs]
+  );
+
+  const addConsumableItem = useCallback(
+    async (name: string) => {
+      if (blockReadOnlyMutation()) return;
+      const v = normalizeLabel(name);
+      if (!v) return;
+      await catalogService.createConsumableItem(v);
       await refreshCatalogs();
     },
     [refreshCatalogs]
@@ -339,6 +390,42 @@ export function ERPProvider({ children }: { children: ReactNode }) {
     [findFixedByName, refreshCatalogs]
   );
 
+  const renameConsumableGroup = useCallback(
+    async (oldName: string, newName: string) => {
+      if (blockReadOnlyMutation()) return;
+      const group = findConsumableGroupByName(oldName);
+      const v = normalizeLabel(newName);
+      if (!group || !v) return;
+      await catalogService.renameConsumableGroup(group.id, v);
+      // The server already rewrote every matching ledger row. Patch the rows
+      // we have instead of re-downloading the whole ledger — that refetch was
+      // what made a rename feel slow.
+      setConsumableGroups((prev) =>
+        prev.map((item) => (item.id === group.id ? { ...item, name: v } : item)),
+      );
+      setTransactions((prev) =>
+        prev.map((row) =>
+          row.type === 'expense_consumable' && row.category === group.name
+            ? { ...row, category: v }
+            : row,
+        ),
+      );
+    },
+    [findConsumableGroupByName]
+  );
+
+  const renameConsumableItem = useCallback(
+    async (oldName: string, newName: string) => {
+      if (blockReadOnlyMutation()) return;
+      const item = findConsumableByName(oldName);
+      const v = normalizeLabel(newName);
+      if (!item || !v) return;
+      await catalogService.renameConsumableItem(item.id, v);
+      await refreshCatalogs();
+    },
+    [findConsumableByName, refreshCatalogs]
+  );
+
   const renameProductCostItem = useCallback(
     async (oldName: string, newName: string) => {
       if (blockReadOnlyMutation()) return;
@@ -372,6 +459,29 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       await refreshCatalogs();
     },
     [findFixedByName, refreshCatalogs]
+  );
+
+  const deleteConsumableGroup = useCallback(
+    async (name: string) => {
+      if (blockReadOnlyMutation()) return;
+      const group = findConsumableGroupByName(name);
+      if (!group) return;
+      await catalogService.deleteConsumableGroup(group.id);
+      // Past purchases keep the name stored on each row. Only the picker list changes.
+      setConsumableGroups((prev) => prev.filter((item) => item.id !== group.id));
+    },
+    [findConsumableGroupByName]
+  );
+
+  const deleteConsumableItem = useCallback(
+    async (name: string) => {
+      if (blockReadOnlyMutation()) return;
+      const item = findConsumableByName(name);
+      if (!item) return;
+      await catalogService.deleteConsumableItem(item.id);
+      await refreshCatalogs();
+    },
+    [findConsumableByName, refreshCatalogs]
   );
 
   const deleteProductCostItem = useCallback(
@@ -450,6 +560,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       refreshFundBalances,
       fixedCostItems,
       productCostItems,
+      consumableGroups,
+      consumableItems,
       suppliers,
       itemNames,
       addFixedCostItem,
@@ -458,6 +570,12 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       addProductCostItem,
       renameProductCostItem,
       deleteProductCostItem,
+      addConsumableGroup,
+      renameConsumableGroup,
+      deleteConsumableGroup,
+      addConsumableItem,
+      renameConsumableItem,
+      deleteConsumableItem,
       addItemName,
       renameItemName,
       deleteItemName,
@@ -489,6 +607,8 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       refreshFundBalances,
       fixedCostItems,
       productCostItems,
+      consumableGroups,
+      consumableItems,
       suppliers,
       itemNames,
       addFixedCostItem,
@@ -497,6 +617,12 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       addProductCostItem,
       renameProductCostItem,
       deleteProductCostItem,
+      addConsumableGroup,
+      renameConsumableGroup,
+      deleteConsumableGroup,
+      addConsumableItem,
+      renameConsumableItem,
+      deleteConsumableItem,
       addItemName,
       renameItemName,
       deleteItemName,
@@ -529,6 +655,12 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       addProductCostItem,
       renameProductCostItem,
       deleteProductCostItem,
+      addConsumableGroup,
+      renameConsumableGroup,
+      deleteConsumableGroup,
+      addConsumableItem,
+      renameConsumableItem,
+      deleteConsumableItem,
       addItemName,
       renameItemName,
       deleteItemName,
@@ -552,6 +684,12 @@ export function ERPProvider({ children }: { children: ReactNode }) {
       addProductCostItem,
       renameProductCostItem,
       deleteProductCostItem,
+      addConsumableGroup,
+      renameConsumableGroup,
+      deleteConsumableGroup,
+      addConsumableItem,
+      renameConsumableItem,
+      deleteConsumableItem,
       addItemName,
       renameItemName,
       deleteItemName,

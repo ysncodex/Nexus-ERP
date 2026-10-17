@@ -62,9 +62,18 @@ export function loginAsManager(): StaticUser {
   return loginAs('manager');
 }
 
-export function logoutAndClearAllStorage(): void {
+/** Keys tied to the signed-in session. Device data (offline POS queue, stock, printer, theme) is kept. */
+const SESSION_STORAGE_KEYS = [
+  STORAGE_KEYS.AUTH_TOKEN,
+  STORAGE_KEYS.USER,
+  STORAGE_KEYS.ERP_STATE,
+  STORAGE_KEYS.DATE_RANGE,
+  STORAGE_KEYS.ERP_BUSINESS_DAY,
+];
+
+export function logoutAndClearSession(): void {
   if (typeof window === 'undefined') return;
-  localStorage.clear();
+  for (const key of SESSION_STORAGE_KEYS) localStorage.removeItem(key);
 }
 
 export function isAuthenticated(): boolean {

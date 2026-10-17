@@ -37,7 +37,7 @@ import type {
 export function PosSyncQuickGuide() {
   return (
     <section
-      aria-label="How POS Sync works"
+      aria-label="How Sales Sync works"
       className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3 sm:p-5"
     >
       <p className="text-xs font-bold uppercase tracking-wide text-indigo-700 mb-3">Quick guide</p>
@@ -112,7 +112,7 @@ export function PosSyncConnectionBar({
             <p className="text-sm font-semibold text-slate-800 mt-2 leading-snug">
               {statusMessage}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{lastSyncPhrase}</p>
+            <p className="text-xs text-erp-secondary mt-1">{lastSyncPhrase}</p>
           </div>
         </div>
 
@@ -525,10 +525,10 @@ export function PosSyncTransactionLog({
                           <button
                             type="button"
                             onClick={() => onEdit(row)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
                             title="Edit (manager)"
                           >
-                            <Pencil size={13} />
+                            <Pencil size={13} aria-hidden="true" /> Edit
                           </button>
                           <button
                             type="button"

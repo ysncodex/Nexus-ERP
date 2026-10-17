@@ -14,7 +14,7 @@ export function StatCard({
       <div className="p-5 flex flex-col h-full gap-3">
         {/* Top row: title + icon */}
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-tight pr-2">
+          <p className="text-[11px] font-bold text-erp-muted uppercase tracking-widest leading-tight pr-2">
             {title}
           </p>
           <div className={`p-2.5 rounded-xl shrink-0 ${bgClass}`}>
@@ -30,7 +30,7 @@ export function StatCard({
         {/* Bottom row: subtext + trend badge */}
         <div className="mt-auto flex items-center justify-between gap-2">
           {subtext && (
-            <p className="text-xs text-slate-400 leading-snug">{subtext}</p>
+            <p className="text-xs text-erp-secondary leading-snug">{subtext}</p>
           )}
           {trend !== undefined && (
             <span

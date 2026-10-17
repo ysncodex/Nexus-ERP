@@ -11,4 +11,5 @@
 export { default as DailyExpense }   from './pages/DailyExpense';
 export { default as DailyRecord }    from './pages/DailyRecord';
 export { default as FixedCosts }     from './pages/FixedCosts';
+export { default as Consumables }    from './pages/Consumables';
 export { default as FundManagement } from './pages/FundManagement';

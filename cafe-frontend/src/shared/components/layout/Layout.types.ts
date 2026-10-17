@@ -12,13 +12,25 @@ export interface SidebarProps {
 }
 
 export type TabId =
-  // Main
-  | 'dashboard' | 'manager_dashboard' | 'daily_record' | 'report' | 'product_sales'
-  // Operations
-  | 'daily_expense' | 'product_cost' | 'fixed_cost' | 'fund' | 'delivery_settlement'
-  // Revenue
-  | 'pos_sync' | 'new_order' | 'product_list' | 'order_history'
-  // Inventory
+  | 'dashboard'
+  | 'manager_dashboard'
+  | 'daily_record'
+  | 'report'
+  | 'product_sales'
+  | 'daily_expense'
+  | 'product_cost'
+  | 'consumables'
+  | 'fixed_cost'
+  | 'fund'
+  | 'delivery_settlement'
+  | 'pos_sync'
+  | 'new_order'
+  | 'daily_sales'
+  | 'invoices'
+  | 'order_history'
+  | 'product_list'
+  | 'stock_levels'
   | 'suppliers'
-  // Workforce
-  | 'staff_roster' | 'payroll';
+  | 'wastage'
+  | 'staff_roster'
+  | 'payroll';

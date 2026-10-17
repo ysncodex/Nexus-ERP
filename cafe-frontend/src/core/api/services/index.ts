@@ -9,6 +9,7 @@ export { suppliersService } from './suppliers.service';
 export { fundsService } from './funds.service';
 export { deliverySettlementsService } from './deliverySettlements.service';
 export type { DeliverySettlementUpdateData } from './deliverySettlements.service';
+export { hrService } from './hr.service';
 
 // Re-export types
 export type { LoginCredentials, AuthResponse, AuthRole, User } from './auth.service';

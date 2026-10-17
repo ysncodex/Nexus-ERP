@@ -3,6 +3,7 @@
  * Centralized error handling for try-catch blocks
  */
 
+import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -70,6 +71,10 @@ class ErrorHandler {
    * Extract meaningful error message
    */
   private getErrorMessage(error: unknown): string {
+    if (isAxiosError<{ message?: unknown }>(error)) {
+      const serverMessage = error.response?.data?.message;
+      if (typeof serverMessage === 'string' && serverMessage.trim()) return serverMessage;
+    }
     if (error instanceof Error) {
       return error.message;
     }

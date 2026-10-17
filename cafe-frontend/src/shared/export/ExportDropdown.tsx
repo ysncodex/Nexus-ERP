@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { handleError } from '@/shared/utils';
 import type { ExportFormat, PageExportConfig, ExportPreviewPayload } from './types';
@@ -78,15 +78,19 @@ export function ExportDropdown<T>({ config, disabled, className = '' }: ExportDr
           className="flex items-center gap-2 min-w-[120px] px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-label="Export"
         >
           {loading ? (
-            <Loader2 size={15} className="animate-spin text-slate-400" />
+            <Loader2 size={15} className="animate-spin text-erp-muted" />
           ) : (
-            <span className="flex-1 text-left">Export</span>
+            <>
+              <Download size={15} className="shrink-0 text-slate-600" aria-hidden="true" />
+              <span className="flex-1 text-left">Export</span>
+            </>
           )}
           <ChevronDown
             size={14}
-            className={`text-slate-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`text-erp-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           />
         </button>
 

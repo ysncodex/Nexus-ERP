@@ -2,9 +2,19 @@
  * Map ERP Transaction records ↔ backend sales/expenses API payloads.
  */
 import type { Transaction } from '@/core/types';
+import { isLedgerExpense } from '@/core/types/transaction.types';
 import type { SaleCreateData, SaleUpdateData } from '@/core/api/services/sales.service';
 import type { ExpenseCreateData } from '@/core/api/services/expenses.service';
 import { parseBusinessDate, resolveTransactionDate } from '@/shared/utils/businessDate';
+
+const NOTE_SEPARATOR = '\n[Note] ';
+
+/** Catalog name is the text before an optional note, matching the expense pages. */
+function itemName(description: string | undefined): string {
+  const raw = description ?? '';
+  const cut = raw.indexOf(NOTE_SEPARATOR);
+  return (cut >= 0 ? raw.slice(0, cut) : raw).trim();
+}
 
 function toIsoDate(date: Date | string | undefined): string {
   if (!date) return resolveTransactionDate(new Date()).toISOString();
@@ -34,7 +44,7 @@ export function isSaleType(type: string): boolean {
 }
 
 export function isExpenseType(type: string): boolean {
-  return type === 'expense_product' || type === 'expense_fixed';
+  return isLedgerExpense(type);
 }
 
 /** Simple sale row (Dashboard Quick Sale) → POST /sales */
@@ -98,7 +108,7 @@ export function transactionToSaleUpdate(tx: Transaction): SaleUpdateData {
 export function transactionToExpenseCreate(
   data: Omit<Transaction, 'id' | 'date'> & { date?: Date },
 ): ExpenseCreateData {
-  const type = data.type as 'expense_product' | 'expense_fixed';
+  const type = data.type as ExpenseCreateData['type'];
   if (!data.method) {
     throw new Error('Payment method is required for expenses');
   }
@@ -106,8 +116,9 @@ export function transactionToExpenseCreate(
   return {
     type,
     category:
-      data.category ?? (type === 'expense_product' ? 'Product' : 'Fixed'),
-    item: data.description,
+      data.category ??
+      (type === 'expense_product' ? 'Product' : type === 'expense_consumable' ? 'Other' : 'Fixed'),
+    item: itemName(data.description),
     supplier: data.supplier,
     quantity: data.quantity,
     unit: data.unit,

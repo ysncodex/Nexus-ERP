@@ -83,81 +83,87 @@ function discountLabel(order: NewOrderData): string {
 // ─── Shared CSS ─────────────────────────────────────────────────────────────
 
 export const RECEIPT_CSS = `
-.rcpt { font-family: 'Courier New', Courier, monospace; color: #111827; width: 100%; font-size: 13px; line-height: 1.5; letter-spacing: 0.08px; }
-.rcpt * { box-sizing: border-box; }
+.rcpt, .chit { font-family: "Segoe UI", Arial, Helvetica, sans-serif; color: #000; width: 100%; }
+.rcpt { font-size: 12px; line-height: 1.35; }
+.rcpt *, .chit * { box-sizing: border-box; }
 .rcpt-center { text-align: center; }
-.rcpt-name { font-size: 18px; font-weight: 900; letter-spacing: 0.25px; line-height: 1.2; }
-.rcpt-title { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.22px; margin-bottom: 4px; }
-.rcpt-muted { color: #1f2937; }
+.rcpt-name { font-size: 17px; font-weight: 800; letter-spacing: 0.2px; line-height: 1.15; }
+.rcpt-kicker { margin-top: 6px; font-size: 11px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; }
+.rcpt-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.1px; margin: 0 0 4px; }
+.rcpt-tag { font-size: 10px; font-weight: 600; line-height: 1.35; margin-top: 1px; }
+.rcpt-muted { color: #000; }
 .rcpt-sm { font-size: 12px; }
-.rcpt-xs { font-size: 11px; }
-.rcpt-thanks { font-size: 13px; font-weight: 900; margin-bottom: 3px; }
-.rcpt-hr { border: none; border-top: 1.5px solid #111827; margin: 8px 0; }
-.rcpt-hr-solid { border: none; border-top: 3px solid #111827; margin: 9px 0; }
+.rcpt-xs { font-size: 10px; font-weight: 600; }
+.rcpt-thanks { font-size: 12px; font-weight: 800; margin-bottom: 2px; }
+.rcpt-hr { border: none; border-top: 1px solid #000; margin: 7px 0; }
+.rcpt-hr-solid { border: none; border-top: 2px solid #000; margin: 7px 0; }
 .rcpt-row { display: table; width: 100%; table-layout: fixed; padding: 1px 0; }
-.rcpt-row + .rcpt-row { margin-top: 2px; }
+.rcpt-row + .rcpt-row { margin-top: 1px; }
 .rcpt-row > span { display: table-cell; vertical-align: top; }
-.rcpt-row > span:last-child { text-align: right; white-space: nowrap; }
-.rcpt-label { color: #111827; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15px; font-size: 11px; }
-.rcpt-strong { font-weight: 900; }
-.rcpt-badge { display: inline-block; background: #111827; color: #fff; font-weight: 800; padding: 3px 10px; letter-spacing: 0.2px; }
-.rcpt-items { margin: 6px 0; }
-.rcpt-item { margin-bottom: 9px; padding-bottom: 4px; border-bottom: 1px dashed #d1d5db; }
-.rcpt-item:last-child { border-bottom: none; }
+.rcpt-row > span:last-child { text-align: right; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rcpt-label { color: #000; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; }
+.rcpt-strong { font-weight: 800; }
+.rcpt-badge { display: inline-block; border: 2px solid #000; font-weight: 800; font-size: 14px; padding: 2px 8px; letter-spacing: 0.6px; }
+.rcpt-items { margin: 2px 0 4px; }
+.rcpt-item { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed #000; }
+.rcpt-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .rcpt-item-top { display: table; width: 100%; table-layout: fixed; }
 .rcpt-item-top > span { display: table-cell; vertical-align: top; }
 .rcpt-item-top > span:last-child { text-align: right; white-space: nowrap; }
-.rcpt-item-name { font-weight: 800; word-break: break-word; padding-right: 6px; }
-.rcpt-item-total { font-weight: 900; white-space: nowrap; }
-.rcpt-item-sub { color: #111827; font-size: 12px; margin-top: 2px; font-weight: 800; }
-.rcpt-pl-3 { padding-left: 12px; }
-.rcpt-addon-row { margin-top: 3px; padding-bottom: 2px; border-bottom: 1px dotted #e5e7eb; }
-.rcpt-addon-row:last-child { border-bottom: none; }
-.rcpt-total-row { display: table; width: 100%; table-layout: fixed; font-weight: 900; font-size: 16px; }
-.rcpt-total-row > span { display: table-cell; vertical-align: top; }
-.rcpt-total-row > span:last-child { text-align: right; white-space: nowrap; }
-.rcpt-section { margin: 8px 0; }
-.rcpt-meta-block { margin-bottom: 6px; }
-.rcpt-gift { font-size: 10px; font-weight: 800; }
-.rcpt-free { font-weight: 900; }
-.rcpt-pay-block { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #9ca3af; }
+.rcpt-item-name { font-size: 13px; font-weight: 700; line-height: 1.25; word-break: break-word; padding-right: 6px; }
+.rcpt-item-total { font-size: 13px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rcpt-item-sub { font-size: 10px; font-weight: 600; margin-top: 1px; }
+.rcpt-pl-3 { padding-left: 10px; }
+.rcpt-addon-row { margin-top: 3px; }
+.rcpt-total-row { display: table; width: 100%; table-layout: fixed; font-weight: 800; font-size: 16px; letter-spacing: 0.3px; }
+.rcpt-total-row > span { display: table-cell; vertical-align: middle; }
+.rcpt-total-row > span:last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rcpt-section { margin: 6px 0; }
+.rcpt-meta-block { margin-bottom: 2px; }
+.rcpt-gift { font-size: 10px; font-weight: 800; letter-spacing: 0.3px; }
+.rcpt-free { font-weight: 800; }
+.rcpt-pay-block { margin-top: 2px; }
 
-.chit { font-family: 'Courier New', Courier, monospace; color: #111827; width: 100%; }
-.chit-title { text-align: center; font-size: 28px; font-weight: 900; letter-spacing: 0.8px; }
-.chit-type { text-align: center; font-size: 18px; font-weight: 900; text-transform: uppercase; margin-top: 3px; }
-.chit-table { text-align: center; margin-top: 7px; }
-.chit-meta { display: table; width: 100%; table-layout: fixed; font-weight: 900; font-size: 16px; }
+.chit { font-size: 13px; line-height: 1.25; }
+.chit-brand { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+.chit-title { text-align: center; font-size: 22px; font-weight: 800; letter-spacing: 2px; line-height: 1.05; margin-top: 1px; }
+.chit-type { text-align: center; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
+.chit-table { text-align: center; margin-top: 6px; }
+.chit-meta { display: table; width: 100%; table-layout: fixed; font-weight: 800; font-size: 13px; }
 .chit-meta > span { display: table-cell; vertical-align: top; }
-.chit-meta > span:last-child { text-align: right; white-space: nowrap; }
-.chit-name { font-weight: 900; margin-top: 5px; font-size: 16px; }
-.chit-items { margin: 10px 0; }
-.chit-item { display: table; width: 100%; table-layout: fixed; margin-bottom: 12px; }
+.chit-meta > span:last-child { text-align: right; white-space: nowrap; font-weight: 700; }
+.chit-name { font-weight: 800; margin-top: 4px; font-size: 13px; }
+.chit-items { margin: 6px 0; }
+.chit-item { display: table; width: 100%; table-layout: fixed; margin-bottom: 8px; }
+.chit-item-addon { margin-top: -4px; margin-bottom: 8px; }
 .chit-qty, .chit-item-name { display: table-cell; vertical-align: top; }
-.chit-qty { font-size: 24px; font-weight: 900; line-height: 1; width: 45px; white-space: nowrap; }
-.chit-item-name { font-size: 18px; font-weight: 900; line-height: 1.3; word-break: break-word; }
+.chit-qty { font-size: 18px; font-weight: 800; line-height: 1.05; width: 38px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chit-item-name { font-size: 15px; font-weight: 700; line-height: 1.2; word-break: break-word; }
+.chit-addon-name { padding-left: 2px; font-size: 13px; font-weight: 700; }
 `.trim();
 
 export const RECEIPT_THERMAL_PRINT_CSS = `
-html, body, .rcpt, .chit, .rcpt *, .chit * { color: #000 !important; -webkit-font-smoothing: none !important; -moz-osx-font-smoothing: auto !important; text-rendering: geometricPrecision; }
-.rcpt, .chit { font-family: 'Courier New', Courier, monospace !important; font-size: 14px !important; line-height: 1.42 !important; font-weight: 900 !important; }
-.rcpt-muted, .rcpt-item-sub, .rcpt-gift, .rcpt-free { color: #000 !important; font-weight: 900 !important; }
-.rcpt-label { font-size: 12px !important; color: #000 !important; font-weight: 900 !important; }
-.rcpt-name { font-size: 20px !important; font-weight: 900 !important; }
-.rcpt-title { font-size: 14px !important; font-weight: 900 !important; }
-.rcpt-thanks { font-size: 14px !important; font-weight: 900 !important; }
-.rcpt-sm { font-size: 13px !important; }
-.rcpt-xs { font-size: 11px !important; }
-.rcpt-item-sub { font-size: 12px !important; }
-.rcpt-total-row { font-size: 17px !important; }
-.rcpt-hr { border-top: 1.5px solid #000 !important; margin: 6px 0 !important; }
-.rcpt-hr-solid { border-top: 3px solid #000 !important; margin: 6px 0 !important; }
-.rcpt-badge { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.chit-title { font-size: 32px !important; }
-.chit-type { font-size: 20px !important; }
-.chit-meta { font-size: 18px !important; }
-.chit-name { font-size: 18px !important; }
-.chit-qty { font-size: 28px !important; }
-.chit-item-name { font-size: 22px !important; }
+html, body, .rcpt, .chit, .rcpt *, .chit * { color: #000 !important; -webkit-font-smoothing: none !important; text-rendering: geometricPrecision; }
+.rcpt, .chit { font-family: "Segoe UI", Arial, Helvetica, sans-serif !important; }
+.rcpt { font-size: 12px !important; line-height: 1.3 !important; }
+.rcpt-name { font-size: 18px !important; font-weight: 800 !important; }
+.rcpt-kicker { font-size: 11px !important; font-weight: 800 !important; }
+.rcpt-title { font-size: 11px !important; font-weight: 800 !important; }
+.rcpt-tag, .rcpt-xs, .rcpt-item-sub { font-size: 10px !important; font-weight: 600 !important; color: #000 !important; }
+.rcpt-label { font-size: 10px !important; font-weight: 700 !important; color: #000 !important; }
+.rcpt-item-name { font-size: 13px !important; font-weight: 700 !important; }
+.rcpt-item-total { font-size: 13px !important; font-weight: 800 !important; }
+.rcpt-thanks { font-size: 12px !important; font-weight: 800 !important; }
+.rcpt-total-row { font-size: 16px !important; font-weight: 800 !important; }
+.rcpt-hr { border-top: 1px solid #000 !important; }
+.rcpt-hr-solid { border-top: 2px solid #000 !important; }
+.rcpt-badge { border: 2px solid #000 !important; font-weight: 800 !important; }
+.chit-title { font-size: 24px !important; font-weight: 800 !important; }
+.chit-type { font-size: 14px !important; font-weight: 800 !important; }
+.chit-meta, .chit-name { font-size: 13px !important; font-weight: 800 !important; }
+.chit-qty { font-size: 20px !important; font-weight: 800 !important; }
+.chit-item-name { font-size: 16px !important; font-weight: 700 !important; }
+.chit-addon-name { font-size: 14px !important; font-weight: 700 !important; }
 `.trim();
 
 // ─── Customer receipt HTML ──────────────────────────────────────────────────
@@ -253,11 +259,12 @@ export function buildCustomerReceiptHTML(order: NewOrderData): string {
 <div class="rcpt">
   <div class="rcpt-center rcpt-section">
     <div class="rcpt-name">${esc(RECEIPT_BRAND.name)}</div>
-    <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.tagline)}</div>
-    <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.address)}</div>
-    <div class="rcpt-muted rcpt-xs">${esc(RECEIPT_BRAND.phone)}</div>
+    <div class="rcpt-tag">${esc(RECEIPT_BRAND.tagline)}</div>
+    <div class="rcpt-tag">${esc(RECEIPT_BRAND.address)}</div>
+    <div class="rcpt-tag">${esc(RECEIPT_BRAND.phone)}</div>
+    <div class="rcpt-kicker">Customer Receipt</div>
   </div>
-  <hr class="rcpt-hr" />
+  <hr class="rcpt-hr-solid" />
   <div class="rcpt-section rcpt-meta-block">${metaRows.join('')}</div>
   <hr class="rcpt-hr" />
   <div class="rcpt-title">Items</div>
@@ -285,7 +292,7 @@ export function buildKitchenChitHTML(order: NewOrderData): string {
     .map((oi) => {
       const giftTag = oi.isGift ? ' <span class="rcpt-gift">[GIFT]</span>' : '';
       let html = `
-      <div class="chit-item" style="margin-bottom: 4px;">
+      <div class="chit-item">
         <span class="chit-qty">${oi.quantity}x</span>
         <span class="chit-item-name">${esc(oi.menuItem.name)}${giftTag}</span>
       </div>`;
@@ -294,9 +301,9 @@ export function buildKitchenChitHTML(order: NewOrderData): string {
       if (oi.addons && oi.addons.length > 0) {
         oi.addons.forEach((a) => {
           html += `
-          <div class="chit-item" style="margin-top: 2px; margin-bottom: 6px;">
+          <div class="chit-item chit-item-addon">
             <span class="chit-qty"></span>
-            <span class="chit-item-name" style="padding-left: 20px;">+ ${esc(a.name)}</span>
+            <span class="chit-item-name chit-addon-name">+ ${esc(a.name)}</span>
           </div>`;
         });
       }
@@ -313,6 +320,7 @@ export function buildKitchenChitHTML(order: NewOrderData): string {
 
   return `
 <div class="chit">
+  <div class="chit-brand">${esc(RECEIPT_BRAND.name)}</div>
   <div class="chit-title">KITCHEN</div>
   <div class="chit-type">${esc(channelDisplayLabel(order))}</div>
   ${tableHTML}

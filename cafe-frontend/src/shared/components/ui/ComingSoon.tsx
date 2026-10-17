@@ -25,8 +25,8 @@ export function ComingSoon({ icon: Icon, title, description, accentColor = 'ambe
         <Icon size={40} className={a.icon} strokeWidth={1.5} />
       </div>
       <div className="space-y-1.5">
-        <h2 className="text-2xl font-bold text-slate-700">{title}</h2>
-        <p className="text-slate-400 text-sm max-w-xs">{description}</p>
+        <h2 className="sr-only">{title}</h2>
+        <p className="text-sm leading-relaxed text-erp-secondary max-w-xs">{description}</p>
       </div>
       <span className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide ring-1 ${a.badge}`}>
         Coming Soon

@@ -1,49 +1,54 @@
 /**
- * ManagerDashboard — shift-focused operations cockpit.
+ * ManagerDashboard — the floor manager's cockpit.
  *
- * Built for the person running the floor, not the books. It answers four
- * questions at a glance:
- *   1. How is today's shift going?           → Live daily sales & orders
- *   2. Does the drawer reconcile?            → Cash & bKash point-of-sale balances
- *   3. What's moving on the floor?           → Recent orders & top items
+ * Answers three questions without any clicks:
+ *   1. How is today going?        → KPI strip + sales mix
+ *   2. Does the drawer reconcile? → Cash drawer panel with a physical count check
+ *   3. What's moving?             → Recent orders + top items
+ *
+ * Page title/heading is provided by the app shell (Header), so none here.
  */
-
-import { useState, useMemo, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
-  TrendingUp,
-  TrendingDown,
   Banknote,
-  Smartphone,
-  Landmark,
-  Utensils,
-  Clock,
-  ShoppingCart,
   CalendarDays,
-  Wallet,
-  Flame,
-  RefreshCw,
-  ScrollText,
   CircleDollarSign,
+  Clock,
+  Flame,
+  Landmark,
+  RefreshCw,
+  ShoppingCart,
+  Smartphone,
+  TrendingDown,
+  TrendingUp,
+  Utensils,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
-
 import { useERP } from '@/core/context/useERP';
 import { handleError } from '@/shared/utils';
 import { businessDateKey, todayBusinessKey, formatBusinessTime } from '@/shared/utils/businessDate';
 import { getUserDisplayName } from '@/shared/utils/staticPassword';
-import type { Transaction, PaymentMethod } from '@/core/types';
-import { isDeliverySettlementSale } from '@/core/types';
+import {
+  isLedgerExpense,
+  isDeliverySettlementSale,
+  type Transaction,
+  type PaymentMethod,
+} from '@/core/types';
 
-// ─── Utility functions ────────────────────────────────────────────────────────
+// ─── Constants & formatters ───────────────────────────────────────────────────
+const LOW_CASH_THRESHOLD = 2_000;
+const POLL_INTERVAL_MS = 20_000;
+const RECENT_ORDER_LIMIT = 2;
+const TOP_ITEM_LIMIT = 2;
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+const money = (n: number) => `৳${Math.round(Math.abs(n)).toLocaleString('en-US')}`;
+const signedMoney = (n: number) => `${n < 0 ? '−' : '+'}${money(n)}`;
+const pct = (part: number, total: number) => (total > 0 ? Math.round((part / total) * 100) : 0);
+
+const dateLabel = () =>
+  new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -52,531 +57,584 @@ function greeting(): string {
   return 'Good evening';
 }
 
-// ─── Today's shift analytics ──────────────────────────────────────────────────
+const METHOD_META: Record<
+  PaymentMethod,
+  { label: string; icon: LucideIcon; tone: string; bar: string }
+> = {
+  cash: {
+    label: 'Cash',
+    icon: Banknote,
+    tone: 'bg-emerald-50 text-emerald-600',
+    bar: 'bg-emerald-500',
+  },
+  bkash: { label: 'bKash', icon: Smartphone, tone: 'bg-pink-50 text-pink-600', bar: 'bg-pink-500' },
+  bank: {
+    label: 'Card / bank',
+    icon: Landmark,
+    tone: 'bg-blue-50 text-blue-600',
+    bar: 'bg-blue-500',
+  },
+};
 
+const CHANNEL_META = {
+  in_store: { label: 'In-store', bar: 'bg-amber-500' },
+  foodpanda: { label: 'Foodpanda', bar: 'bg-rose-500' },
+  foodi: { label: 'Foodi', bar: 'bg-violet-500' },
+} as const;
+
+// ─── Today's analytics ────────────────────────────────────────────────────────
 interface TopItem {
   name: string;
   qty: number;
   revenue: number;
 }
 
-function useShiftStats(transactions: Transaction[]) {
+function useTodayStats(transactions: Transaction[]) {
   return useMemo(() => {
     const todayKey = todayBusinessKey();
-
     let revenue = 0;
     let orderCount = 0;
     let expenses = 0;
-    const byMethod: Record<PaymentMethod, number> = { cash: 0, bkash: 0, bank: 0 };
-    const byChannel = { in_store: 0, foodpanda: 0, foodi: 0 };
-    const todaySales: Transaction[] = [];
+    const salesByMethod: Record<PaymentMethod, number> = { cash: 0, bkash: 0, bank: 0 };
+    const expensesByMethod: Record<PaymentMethod, number> = { cash: 0, bkash: 0, bank: 0 };
+    const salesByChannel = { in_store: 0, foodpanda: 0, foodi: 0 };
+    const sales: Transaction[] = [];
     const itemMap = new Map<string, TopItem>();
 
     for (const t of transactions) {
       if (!t.date || businessDateKey(t.date) !== todayKey) continue;
+      const amt = Number(t.amount) || 0;
 
       if (t.type === 'sale') {
-        const amt = Number(t.amount);
         revenue += amt;
         if (!isDeliverySettlementSale(t)) orderCount++;
-        todaySales.push(t);
-        if (t.method) byMethod[t.method] += amt;
-        if (t.channel) byChannel[t.channel] += amt;
+        sales.push(t);
+        if (t.method) salesByMethod[t.method] += amt;
+        if (t.channel && t.channel in salesByChannel) salesByChannel[t.channel] += amt;
 
-        if (t.receiptLines?.length) {
-          for (const line of t.receiptLines) {
-            const key = line.name.trim().toLowerCase();
-            const existing = itemMap.get(key) ?? { name: line.name, qty: 0, revenue: 0 };
-            existing.qty += Number(line.qty) || 0;
-            existing.revenue += (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
-            itemMap.set(key, existing);
-          }
+        for (const line of t.receiptLines ?? []) {
+          const qty = Number(line.qty) || 0;
+          const key = line.name.trim().toLowerCase();
+          const row = itemMap.get(key) ?? { name: line.name, qty: 0, revenue: 0 };
+          row.qty += qty;
+          row.revenue += qty * (Number(line.unitPrice) || 0);
+          itemMap.set(key, row);
         }
       } else if (t.type === 'sale_adjustment') {
-        const amt = Number(t.amount);
+        // Refunds / corrections reduce both revenue and the method they were paid with.
         revenue -= amt;
-        if (t.method) byMethod[t.method] -= amt;
-      } else if (t.type === 'expense_product' || t.type === 'expense_fixed') {
-        expenses += Number(t.amount);
+        if (t.method) salesByMethod[t.method] -= amt;
+      } else if (isLedgerExpense(t.type)) {
+        expenses += amt;
+        if (t.method) expensesByMethod[t.method] += amt;
       }
     }
 
-    // Cap the rendered feed — a busy day can have hundreds of orders and we
-    // only need the most recent ones on screen (full count is in `orderCount`).
-    const recentOrders = [...todaySales]
+    const recentOrders = sales
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 30);
-
-    const topItems = [...itemMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
-
-    const avgOrder = orderCount > 0 ? revenue / orderCount : 0;
+      .slice(0, RECENT_ORDER_LIMIT);
+    const topItems = [...itemMap.values()].sort((a, b) => b.qty - a.qty).slice(0, TOP_ITEM_LIMIT);
 
     return {
       revenue,
       orderCount,
       expenses,
-      netCash: revenue - expenses,
-      avgOrder,
-      byMethod,
-      byChannel,
+      dayResult: revenue - expenses,
+      avgOrder: orderCount > 0 ? revenue / orderCount : 0,
+      salesByMethod,
+      expensesByMethod,
+      salesByChannel,
       recentOrders,
       topItems,
     };
   }, [transactions]);
 }
 
-// ─── Reusable presentational pieces ───────────────────────────────────────────
+// ─── Live refresh: poll only while visible, never overlap requests ────────────
+function useLiveRefresh(refresh: (opts?: { silent?: boolean }) => Promise<unknown> | void) {
+  const [lastSync, setLastSync] = useState(() => new Date());
+  const [syncing, setSyncing] = useState(false);
+  const inFlight = useRef(false);
 
+  const pull = useCallback(
+    async (silent = true) => {
+      if (inFlight.current) return;
+      inFlight.current = true;
+      if (!silent) setSyncing(true);
+      try {
+        await refresh({ silent });
+        setLastSync(new Date());
+      } catch (err) {
+        if (!silent) throw err; // background failures stay quiet; manual ones surface
+      } finally {
+        inFlight.current = false;
+        setSyncing(false);
+      }
+    },
+    [refresh]
+  );
+
+  useEffect(() => {
+    const pullIfVisible = () => {
+      if (document.visibilityState === 'visible') void pull(true);
+    };
+    const id = window.setInterval(pullIfVisible, POLL_INTERVAL_MS);
+    window.addEventListener('focus', pullIfVisible);
+    document.addEventListener('visibilitychange', pullIfVisible);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', pullIfVisible);
+      document.removeEventListener('visibilitychange', pullIfVisible);
+    };
+  }, [pull]);
+
+  return { lastSync, syncing, pull };
+}
+
+// ─── Presentational pieces ────────────────────────────────────────────────────
 function LiveClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1_000);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => setNow(new Date()), 1_000);
+    return () => window.clearInterval(id);
   }, []);
   return (
-    <span className="font-mono tabular-nums">
-      {now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })}
-    </span>
+    <time className="font-mono tabular-nums">
+      {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </time>
   );
 }
 
-interface KpiCardProps {
-  label: string;
-  value: string;
-  hint?: string;
-  icon: LucideIcon;
-  accent: string;
-  iconBg: string;
-}
-
-function KpiCard({ label, value, hint, icon: Icon, accent, iconBg }: KpiCardProps) {
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-          <p
-            className={`mt-2 text-2xl sm:text-[26px] font-black tabular-nums leading-none ${accent}`}
-          >
-            {value}
-          </p>
-          {hint && <p className="mt-1.5 text-[11px] text-slate-400 truncate">{hint}</p>}
-        </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-          <Icon size={18} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({
-  icon: Icon,
+function Panel({
   title,
   subtitle,
   right,
+  children,
+  className = '',
 }: {
-  icon: LucideIcon;
   title: string;
   subtitle?: string;
-  right?: React.ReactNode;
+  right?: ReactNode;
+  children: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-          <Icon size={15} className="text-slate-600" />
-        </div>
+    <section
+      className={`flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white ${className}`}
+    >
+      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-slate-800 truncate">{title}</h2>
-          {subtitle && <p className="text-[11px] text-slate-400 truncate">{subtitle}</p>}
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
         </div>
-      </div>
-      {right}
-    </div>
+        {right}
+      </header>
+      {children}
+    </section>
   );
 }
 
-// ─── Point of Sale reconciliation ─────────────────────────────────────────────
-
-interface BalanceRowProps {
-  label: string;
-  icon: LucideIcon;
-  balance: number;
-  todaySales: number;
-  accent: string;
-  iconBg: string;
-  low?: boolean;
-}
-
-function BalanceRow({
+function Kpi({
   label,
+  value,
+  hint,
   icon: Icon,
-  balance,
-  todaySales,
-  accent,
-  iconBg,
-  low,
-}: BalanceRowProps) {
+  tone,
+  loading,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: LucideIcon;
+  tone: { text: string; chip: string };
+  loading: boolean;
+}) {
   return (
-    <div
-      className={`rounded-xl border p-4 ${
-        low ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white'
-      }`}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${iconBg}`}>
-          <Icon size={14} />
-        </div>
-        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          {label}
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone.chip}`}>
+          <Icon size={15} aria-hidden="true" />
         </span>
       </div>
-      <p className={`text-2xl font-black tabular-nums ${low ? 'text-red-600' : accent}`}>
-        ৳{balance.toLocaleString()}
-      </p>
-      <p className="text-[11px] text-slate-400 mt-1">
-        <span className="font-semibold text-emerald-600">+৳{todaySales.toLocaleString()}</span> in
-        sales today
-      </p>
-      {low && (
-        <p className="text-[10px] text-red-500 font-semibold mt-1">⚠ Low balance — refill soon</p>
+      {loading ? (
+        <div className="mt-2 h-8 w-28 animate-pulse rounded-md bg-slate-100" />
+      ) : (
+        <p
+          className={`mt-1.5 break-words text-2xl font-bold tabular-nums leading-tight ${tone.text}`}
+        >
+          {value}
+        </p>
       )}
+      <p className="mt-1 text-xs text-slate-500">{hint}</p>
     </div>
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+/** One stacked bar + legend. Segments with zero value are hidden. */
+function MixBar({ segments }: { segments: { label: string; value: number; bar: string }[] }) {
+  const total = segments.reduce((s, x) => s + Math.max(x.value, 0), 0);
+  if (total <= 0) return <p className="text-xs text-slate-400">No sales yet today</p>;
+  const visible = segments.filter((s) => s.value > 0);
+  return (
+    <div>
+      <div
+        className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100"
+        role="img"
+        aria-label={visible.map((s) => `${s.label} ${pct(s.value, total)}%`).join(', ')}
+      >
+        {visible.map((s) => (
+          <div key={s.label} className={s.bar} style={{ width: `${(s.value / total) * 100}%` }} />
+        ))}
+      </div>
+      <ul className="mt-2.5 space-y-1.5">
+        {visible.map((s) => (
+          <li key={s.label} className="flex items-center justify-between gap-3 text-xs">
+            <span className="flex items-center gap-2 text-slate-600">
+              <span className={`h-2 w-2 rounded-full ${s.bar}`} />
+              {s.label}
+            </span>
+            <span className="tabular-nums text-slate-500">
+              <span className="font-semibold text-slate-800">{money(s.value)}</span> ·{' '}
+              {pct(s.value, total)}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
+// ─── Cash drawer reconciliation ───────────────────────────────────────────────
+function DrawerPanel({
+  balance,
+  cashSales,
+  cashExpenses,
+}: {
+  balance: number;
+  cashSales: number;
+  cashExpenses: number;
+}) {
+  const low = balance < LOW_CASH_THRESHOLD;
+  // Opening is derived from the live balance, so it also absorbs any transfers made today.
+  const opening = balance - (cashSales - cashExpenses);
+  const rows: [string, string, string][] = [
+    ['Opening cash (derived)', money(opening), 'text-slate-700'],
+    ['Cash sales today', signedMoney(cashSales), 'text-emerald-700'],
+    ['Cash expenses today', signedMoney(-cashExpenses), 'text-rose-600'],
+  ];
+
+  return (
+    <Panel
+      title="Cash drawer"
+      subtitle="How today's cash adds up to the expected balance"
+      className="h-full"
+      right={
+        low && (
+          <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+            Low cash — refill soon
+          </span>
+        )
+      }
+    >
+      <div className="flex flex-1 flex-col p-4">
+        <dl className="space-y-3 text-sm">
+          {rows.map(([k, v, cls]) => (
+            <div key={k} className="flex justify-between gap-3">
+              <dt className="text-slate-500">{k}</dt>
+              <dd className={`font-semibold tabular-nums ${cls}`}>{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-auto flex items-baseline justify-between gap-3 border-t border-slate-200 pt-4">
+          <span className="text-sm font-semibold text-slate-800">Expected in drawer</span>
+          <span
+            className={`text-2xl font-bold tabular-nums ${low ? 'text-red-600' : 'text-slate-900'}`}
+          >
+            {money(balance)}
+          </span>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Opening cash comes from the live balance, so it includes any transfers made today.
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function ManagerDashboard() {
   const { transactions, stats, isLoadingTransactions, refreshTransactions } = useERP();
-  const shift = useShiftStats(transactions);
-  const [refreshing, setRefreshing] = useState(false);
-
+  const today = useTodayStats(transactions);
+  const { lastSync, syncing, pull } = useLiveRefresh(refreshTransactions);
   const managerName = getUserDisplayName();
-
-  // Keep the shift view live: poll while this page is open, and pull fresh
-  // numbers whenever the tab/window becomes visible again (e.g. after a
-  // cashier posts an order on another screen).
-  useEffect(() => {
-    const pull = () => {
-      void refreshTransactions({ silent: true });
-    };
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') pull();
-    };
-    const id = window.setInterval(pull, 20_000);
-    window.addEventListener('focus', pull);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.clearInterval(id);
-      window.removeEventListener('focus', pull);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [refreshTransactions]);
+  const initialLoad = isLoadingTransactions && transactions.length === 0;
 
   const handleRefresh = async () => {
     try {
-      setRefreshing(true);
-      await refreshTransactions();
-      toast.success('Shift data refreshed');
+      await pull(false);
+      toast.success('Dashboard refreshed');
     } catch (error) {
       handleError(error, { action: 'manager_refresh', severity: 'low' });
-    } finally {
-      setRefreshing(false);
     }
   };
 
-  const expectedDrawer = stats.cashBalance;
-  const lowCash = stats.cashBalance < 2_000;
+  const methodSegments = (Object.keys(METHOD_META) as PaymentMethod[]).map((m) => ({
+    label: METHOD_META[m].label,
+    value: today.salesByMethod[m],
+    bar: METHOD_META[m].bar,
+  }));
+  const channelSegments = (Object.keys(CHANNEL_META) as (keyof typeof CHANNEL_META)[]).map((c) => ({
+    label: CHANNEL_META[c].label,
+    value: today.salesByChannel[c],
+    bar: CHANNEL_META[c].bar,
+  }));
+  const maxQty = today.topItems[0]?.qty || 1;
+  const totalBalance = stats.cashBalance + stats.bkashBalance + stats.bankBalance;
+  const resultPositive = today.dayResult >= 0;
 
   return (
-    <div className="space-y-5 pb-10">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="min-w-0 space-y-4 pb-6">
+      {/* Greeting + refresh */}
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
+          <p className="text-base font-semibold text-slate-800">
             {greeting()}, {managerName}
-          </h1>
-          <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
-            <CalendarDays size={13} /> {formatDate(new Date())}
-            <span className="mx-1 text-slate-300">·</span>
-            <Clock size={13} /> <LiveClock />
+          </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays size={13} aria-hidden="true" /> {dateLabel()}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock size={13} aria-hidden="true" /> <LiveClock />
+            </span>
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={refreshing || isLoadingTransactions}
-          className="inline-flex items-center gap-2 self-start px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-800 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <span className="text-xs text-slate-500">Updated {formatBusinessTime(lastSync)}</span>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={syncing || isLoadingTransactions}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} aria-hidden="true" />
+            Refresh
+          </button>
+        </div>
       </div>
 
-      {/* ── Live KPI strip ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCard
-          label="Today's Sales"
-          value={`৳${shift.revenue.toLocaleString()}`}
-          hint={`Avg order ৳${Math.round(shift.avgOrder).toLocaleString()}`}
+      {/* KPIs */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi
+          label="Sales today"
+          value={money(today.revenue)}
+          hint={`Average order ${money(today.avgOrder)}`}
           icon={TrendingUp}
-          accent="text-emerald-600"
-          iconBg="bg-emerald-50 text-emerald-600"
+          tone={{ text: 'text-emerald-600', chip: 'bg-emerald-50 text-emerald-600' }}
+          loading={initialLoad}
         />
-        <KpiCard
+        <Kpi
           label="Orders"
-          value={shift.orderCount.toLocaleString()}
-          hint="POS orders this shift"
+          value={today.orderCount.toLocaleString('en-US')}
+          hint="Excludes delivery payouts"
           icon={ShoppingCart}
-          accent="text-slate-800"
-          iconBg="bg-amber-50 text-amber-600"
+          tone={{ text: 'text-slate-900', chip: 'bg-amber-50 text-amber-600' }}
+          loading={initialLoad}
         />
-        <KpiCard
+        <Kpi
           label="Expenses"
-          value={`৳${shift.expenses.toLocaleString()}`}
+          value={money(today.expenses)}
           hint="Spent today"
           icon={TrendingDown}
-          accent="text-rose-600"
-          iconBg="bg-rose-50 text-rose-600"
+          tone={{ text: 'text-rose-600', chip: 'bg-rose-50 text-rose-600' }}
+          loading={initialLoad}
         />
-        <KpiCard
-          label="Net Cash Flow"
-          value={`${shift.netCash < 0 ? '−' : ''}৳${Math.abs(shift.netCash).toLocaleString()}`}
-          hint="Sales − expenses"
+        <Kpi
+          label="Day result"
+          value={`${resultPositive ? '' : '−'}${money(today.dayResult)}`}
+          hint="Sales minus expenses"
           icon={CircleDollarSign}
-          accent={shift.netCash >= 0 ? 'text-emerald-600' : 'text-rose-600'}
-          iconBg="bg-blue-50 text-blue-600"
+          tone={{
+            text: resultPositive ? 'text-emerald-600' : 'text-rose-600',
+            chip: 'bg-blue-50 text-blue-600',
+          }}
+          loading={initialLoad}
         />
       </div>
 
-      {/* ── Main grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-        {/* LEFT (2 cols) — Recent orders + top items */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Recent Orders */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={ScrollText}
-              title="Recent Orders"
-              subtitle="Live flow of today's sales"
-              right={
-                <span className="flex h-2.5 w-2.5 relative shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-                </span>
-              }
-            />
-            <div className="max-h-[420px] overflow-y-auto">
-              {shift.recentOrders.length === 0 ? (
-                <div className="flex flex-col items-center py-14 text-center">
-                  <ShoppingCart size={30} className="text-slate-200 mb-2" />
-                  <p className="text-sm font-semibold text-slate-400">No orders yet today</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    New sales will appear here in real time
-                  </p>
-                </div>
-              ) : (
-                shift.recentOrders.map((order) => (
-                  <div
+      {/* Account balances: same 4-column rhythm as the KPI strip */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi
+          label="Cash drawer"
+          value={money(stats.cashBalance)}
+          hint={`${signedMoney(today.salesByMethod.cash)} in sales today`}
+          icon={Banknote}
+          tone={{
+            text: stats.cashBalance < LOW_CASH_THRESHOLD ? 'text-red-600' : 'text-emerald-700',
+            chip: 'bg-emerald-50 text-emerald-600',
+          }}
+          loading={initialLoad}
+        />
+        <Kpi
+          label="bKash wallet"
+          value={money(stats.bkashBalance)}
+          hint={`${signedMoney(today.salesByMethod.bkash)} in sales today`}
+          icon={Smartphone}
+          tone={{ text: 'text-pink-700', chip: 'bg-pink-50 text-pink-600' }}
+          loading={initialLoad}
+        />
+        <Kpi
+          label="Card / bank"
+          value={money(stats.bankBalance)}
+          hint={`${signedMoney(today.salesByMethod.bank)} in sales today`}
+          icon={Landmark}
+          tone={{ text: 'text-blue-700', chip: 'bg-blue-50 text-blue-600' }}
+          loading={initialLoad}
+        />
+        <Kpi
+          label="Total balance"
+          value={money(totalBalance)}
+          hint={`${signedMoney(today.revenue)} total sales today`}
+          icon={Wallet}
+          tone={{ text: 'text-slate-900', chip: 'bg-slate-100 text-slate-600' }}
+          loading={initialLoad}
+        />
+      </div>
+
+      {/* Reconciliation + sales mix, equal height */}
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <DrawerPanel
+          balance={stats.cashBalance}
+          cashSales={today.salesByMethod.cash}
+          cashExpenses={today.expensesByMethod.cash}
+        />
+        <Panel
+          title="Sales mix"
+          subtitle="Where today's money came from"
+          className="h-full"
+          right={
+            <span className="text-sm font-bold tabular-nums text-slate-900">
+              Total {money(today.revenue)}
+            </span>
+          }
+        >
+          <div className="space-y-4 p-4">
+            <MixBar segments={methodSegments} />
+            <div className="border-t border-slate-100 pt-4">
+              <MixBar segments={channelSegments} />
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      {/* Activity: orders + top items */}
+      <div className="grid items-stretch gap-4 xl:grid-cols-3">
+        <Panel
+          title="Recent orders"
+          subtitle="Newest first"
+          className="h-full xl:col-span-2"
+          right={
+            <span className="relative flex h-2.5 w-2.5" title="Live" aria-label="Live">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+          }
+        >
+          <ul className="max-h-[420px] divide-y divide-slate-100 overflow-y-auto [scrollbar-width:thin]">
+            {today.recentOrders.length === 0 ? (
+              <li className="flex flex-col items-center px-4 py-10 text-center">
+                <ShoppingCart size={28} className="mb-2 text-slate-300" aria-hidden="true" />
+                <p className="text-sm font-semibold text-slate-600">No orders yet today</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  New sales appear here automatically.
+                </p>
+              </li>
+            ) : (
+              today.recentOrders.map((order) => {
+                const meta = METHOD_META[order.method as PaymentMethod] ?? METHOD_META.bank;
+                const MethodIcon = meta.icon;
+                return (
+                  <li
                     key={order.id}
-                    className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
                   >
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        order.method === 'cash'
-                          ? 'bg-emerald-50 text-emerald-600'
-                          : order.method === 'bkash'
-                            ? 'bg-pink-50 text-pink-600'
-                            : 'bg-blue-50 text-blue-600'
-                      }`}
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${meta.tone}`}
                     >
-                      {order.method === 'cash' ? (
-                        <Banknote size={15} />
-                      ) : order.method === 'bkash' ? (
-                        <Smartphone size={15} />
-                      ) : (
-                        <Landmark size={15} />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
+                      <MethodIcon size={15} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
                         {order.description || 'Sale'}
                       </p>
-                      <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
                         {isDeliverySettlementSale(order) && (
-                          <span className="font-bold uppercase tracking-wide text-orange-600 bg-orange-50 border border-orange-100 px-1.5 py-0.5 rounded-md">
-                            Settlement
+                          <span className="rounded-md border border-orange-100 bg-orange-50 px-1.5 py-0.5 font-semibold text-orange-700">
+                            Payout
                           </span>
                         )}
                         {order.orderNumber && (
-                          <span className="font-mono">{order.orderNumber}</span>
+                          <span className="break-all font-mono">{order.orderNumber}</span>
                         )}
-                        {order.orderNumber && <span className="text-slate-300">·</span>}
-                        {formatBusinessTime(new Date(order.date))}
+                        <span>{formatBusinessTime(new Date(order.date))}</span>
                         {order.channel && (
-                          <span className="capitalize">
-                            <span className="text-slate-300"> · </span>
-                            {order.channel.replace('_', '-')}
-                          </span>
+                          <span className="capitalize">{order.channel.replace('_', '-')}</span>
                         )}
                       </p>
                     </div>
-                    <span className="text-sm font-bold text-emerald-600 tabular-nums shrink-0">
-                      ৳{Number(order.amount).toLocaleString()}
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-emerald-600">
+                      {money(Number(order.amount))}
                     </span>
-                  </div>
-                ))
-              )}
-            </div>
-            {shift.orderCount > shift.recentOrders.length && (
-              <div className="px-5 py-2.5 border-t border-slate-100 bg-slate-50 text-center">
-                <p className="text-[11px] text-slate-400">
-                  Showing latest {shift.recentOrders.length} of {shift.orderCount} orders — see{' '}
-                  <span className="font-semibold text-slate-500">Order History</span> for all
-                </p>
-              </div>
+                  </li>
+                );
+              })
             )}
-          </div>
+          </ul>
+          {today.orderCount > today.recentOrders.length && (
+            <p className="border-t border-slate-100 bg-slate-50 px-4 py-2.5 text-center text-xs text-slate-500">
+              Showing the latest {today.recentOrders.length} of {today.orderCount} orders. Open
+              Order History to see all.
+            </p>
+          )}
+        </Panel>
 
-          {/* Top Items */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={Flame}
-              title="Top Items Today"
-              subtitle="Most ordered by quantity"
-            />
-            <div className="p-4 sm:p-5">
-              {shift.topItems.length === 0 ? (
-                <div className="flex flex-col items-center py-10 text-center">
-                  <Utensils size={28} className="text-slate-200 mb-2" />
-                  <p className="text-sm font-semibold text-slate-400">No itemised sales yet</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Top items appear once POS orders come in
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {shift.topItems.map((item, index) => {
-                    const max = shift.topItems[0]?.qty || 1;
-                    return (
-                      <div key={item.name} className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-5 text-[11px] font-black text-slate-400 tabular-nums shrink-0">
-                              #{index + 1}
-                            </span>
-                            <span className="text-sm font-semibold text-slate-700 truncate">
-                              {item.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-xs font-bold text-slate-500 tabular-nums">
-                              {item.qty}×
-                            </span>
-                            <span className="text-sm font-bold text-emerald-600 tabular-nums w-20 text-right">
-                              ৳{Math.round(item.revenue).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-amber-400 transition-all duration-700"
-                            style={{ width: `${Math.min(100, (item.qty / max) * 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+        <Panel title="Top items today" subtitle="By quantity sold" className="h-full">
+          {today.topItems.length === 0 ? (
+            <div className="flex flex-col items-center px-4 py-10 text-center">
+              <Utensils size={28} className="mb-2 text-slate-300" aria-hidden="true" />
+              <p className="text-sm font-semibold text-slate-600">No itemised sales yet</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Top items appear once POS orders come in.
+              </p>
             </div>
-          </div>
-        </div>
-
-        {/* RIGHT (1 col) — POS reconciliation */}
-        <div className="space-y-5">
-          {/* POS Balances / Reconciliation */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <SectionHeader
-              icon={Wallet}
-              title="Point of Sale Balances"
-              subtitle="Reconcile the drawer at close"
-            />
-            <div className="p-4 sm:p-5 space-y-3">
-              <BalanceRow
-                label="Cash Drawer"
-                icon={Banknote}
-                balance={stats.cashBalance}
-                todaySales={shift.byMethod.cash}
-                accent="text-emerald-700"
-                iconBg="bg-emerald-50 text-emerald-600"
-                low={lowCash}
-              />
-              <BalanceRow
-                label="bKash Wallet"
-                icon={Smartphone}
-                balance={stats.bkashBalance}
-                todaySales={shift.byMethod.bkash}
-                accent="text-pink-700"
-                iconBg="bg-pink-50 text-pink-600"
-              />
-
-              {/* End-of-day reconciliation summary */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mt-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-                  Shift Reconciliation
-                </p>
-                <div className="space-y-2 text-[13px]">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Cash sales today</span>
-                    <span className="font-bold text-slate-700 tabular-nums">
-                      +৳{shift.byMethod.cash.toLocaleString()}
+          ) : (
+            <ol className="space-y-4 p-4">
+              {today.topItems.map((item, i) => (
+                <li key={item.name}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-800">
+                      {i === 0 && (
+                        <Flame size={14} className="shrink-0 text-amber-500" aria-hidden="true" />
+                      )}
+                      <span className="break-words">{item.name}</span>
+                    </span>
+                    <span className="shrink-0 text-xs tabular-nums text-slate-500">
+                      <span className="font-semibold text-slate-800">{item.qty}×</span> ·{' '}
+                      {money(item.revenue)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">bKash sales today</span>
-                    <span className="font-bold text-slate-700 tabular-nums">
-                      +৳{shift.byMethod.bkash.toLocaleString()}
-                    </span>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-amber-400"
+                      style={{ width: `${Math.min(100, (item.qty / maxQty) * 100)}%` }}
+                    />
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Card / bank sales</span>
-                    <span className="font-bold text-slate-700 tabular-nums">
-                      +৳{shift.byMethod.bank.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Expenses today</span>
-                    <span className="font-bold text-rose-600 tabular-nums">
-                      −৳{shift.expenses.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
-                    <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
-                      Expected in drawer
-                    </span>
-                    <span
-                      className={`text-base font-black tabular-nums ${
-                        lowCash ? 'text-red-600' : 'text-slate-800'
-                      }`}
-                    >
-                      ৳{expectedDrawer.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-3 leading-relaxed">
-                  Count the physical cash and match it against the expected drawer balance before
-                  closing the shift.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
       </div>
     </div>
   );

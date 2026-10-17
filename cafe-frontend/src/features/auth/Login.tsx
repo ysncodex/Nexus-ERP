@@ -185,7 +185,7 @@ export default function LoginPage() {
                 {CAFE_NAME} <span className="text-amber-500">Cafe</span>
               </h1>
               <p className="mt-0 hidden text-slate-300 leading-relaxed md:mt-0 md:block md:text-base lg:text-lg animate-slide-in-left animation-delay-200">
-                Café ERP for POS orders, daily expenses, inventory, and floor reports — built for{' '}
+                Café ERP for orders, expenses, purchases, and reports — built for{' '}
                 {CAFE_NAME_FULL}.
               </p>
             </div>

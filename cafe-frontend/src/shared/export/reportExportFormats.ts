@@ -2,26 +2,21 @@
  * Financial Report export — single source for PDF, CSV, and XLSX.
  * All formats share the same sections, values, and layout as the Reports UI.
  */
-
 import type { ERPStats } from '@/core/types';
 import type { ExportBlobResult, ExportFormat } from './types';
 import { buildExportFilename } from './generators';
 import { pdfCurrency, pdfPct } from './pdfFormat';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface ReportsChannelData {
   inStore: { revenue: number; share: number };
   foodpanda: { revenue: number; share: number };
   foodi: { revenue: number; share: number };
 }
-
 export interface ReportsTrendRow {
   date: string;
   sales: number;
   expenses: number;
 }
-
 /** Input from the Reports page — same data shown on screen. */
 export interface ReportsExportInput {
   stats: ERPStats;
@@ -31,11 +26,11 @@ export interface ReportsExportInput {
   expenseRatio: string;
   channels: ReportsChannelData;
   trendData: ReportsTrendRow[];
+  costCompletenessNotice?: string;
+  fixedCostGroups?: Array<{ name: string; amount: number }>;
 }
-
 /** @deprecated Use ReportsExportInput */
 export type ReportsPdfInput = ReportsExportInput;
-
 export interface ReportSection {
   id: string;
   title: string;
@@ -43,16 +38,13 @@ export interface ReportSection {
   headers: string[];
   rows: string[][];
 }
-
 export interface ReportDocument {
   title: string;
   periodLabel: string;
   generatedAt: string;
   sections: ReportSection[];
 }
-
 // ─── Brand (PDF) ──────────────────────────────────────────────────────────────
-
 const BRAND = {
   name: 'Beans & Butter Cafe',
   tagline: 'Financial Management System',
@@ -65,20 +57,15 @@ const BRAND = {
   muted: [100, 116, 139] as [number, number, number],
   slate600: [71, 85, 105] as [number, number, number],
 };
-
 const REPORT_FILENAME_BASE = 'financial_report';
-
 // ─── Shared document builder ───────────────────────────────────────────────────
-
 function pctOf(total: number, part: number) {
   return total > 0 ? ((part / total) * 100).toFixed(1) : '0.0';
 }
-
 /** Builds the canonical report structure used by PDF, CSV, and XLSX. */
 export function buildReportDocument(input: ReportsExportInput): ReportDocument {
   const { stats, profitMargin, grossMargin, expenseRatio, channels, trendData } = input;
   const profitLabel = stats.profit >= 0 ? 'Net Profit' : 'Net Loss';
-
   const summary: ReportSection = {
     id: 'summary',
     title: 'Summary',
@@ -87,20 +74,22 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
     rows: [
       ['Total Revenue', pdfCurrency(stats.totalSales)],
       ['Total Expenses', pdfCurrency(stats.totalExpenses)],
-      [
-        profitLabel,
-        `${stats.profit >= 0 ? '+' : '-'}${pdfCurrency(Math.abs(stats.profit))}`,
-      ],
+      [profitLabel, `${stats.profit >= 0 ? '+' : '-'}${pdfCurrency(Math.abs(stats.profit))}`],
       ['Profit Margin', pdfPct(profitMargin)],
       ['Gross Margin', pdfPct(grossMargin)],
       ['Expense Ratio', `${expenseRatio}%`],
     ],
   };
-
+  const costNotice =
+    input.costCompletenessNotice ??
+    (stats.totalSales > 0 && stats.totalProductCost <= 0
+      ? 'No purchases recorded for this period. Profit and margins use recorded expenses only and may be overstated. Record or verify purchases before assessing performance.'
+      : undefined);
+  if (costNotice) summary.rows.unshift(['Cost completeness — review required', costNotice]);
   const plRows: string[][] = [
     ['Total Sales', pdfCurrency(stats.totalSales), '100%'],
     [
-      '(-) Variable Costs (COGS)',
+      '(-) Purchases (COGS)',
       `(${pdfCurrency(stats.totalProductCost)})`,
       `(${pctOf(stats.totalSales, stats.totalProductCost)}%)`,
     ],
@@ -108,19 +97,25 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
   for (const item of stats.topProducts) {
     plRows.push([item.name, pdfCurrency(item.cost), '']);
   }
-  plRows.push(
-    [
-      'Gross Profit',
-      pdfCurrency(stats.grossProfit),
-      `${pctOf(stats.totalSales, stats.grossProfit)}%`,
-    ],
-    [
-      '(-) Fixed Costs (OpEx)',
-      `(${pdfCurrency(stats.totalFixedCost)})`,
-      `(${pctOf(stats.totalSales, stats.totalFixedCost)}%)`,
-    ],
-  );
-  for (const item of stats.topFixed) {
+  plRows.push([
+    'Gross Profit',
+    pdfCurrency(stats.grossProfit),
+    `${pctOf(stats.totalSales, stats.grossProfit)}%`,
+  ]);
+  plRows.push([
+    '(-) Consumables & Packaging',
+    `(${pdfCurrency(stats.totalConsumableCost)})`,
+    `(${pctOf(stats.totalSales, stats.totalConsumableCost)}%)`,
+  ]);
+  for (const item of stats.topConsumables) {
+    plRows.push([item.name, pdfCurrency(item.amount), '']);
+  }
+  plRows.push([
+    '(-) Fixed Expenses (OpEx)',
+    `(${pdfCurrency(stats.totalFixedCost)})`,
+    `(${pctOf(stats.totalSales, stats.totalFixedCost)}%)`,
+  ]);
+  for (const item of input.fixedCostGroups ?? stats.topFixed) {
     plRows.push([item.name, pdfCurrency(item.amount), '']);
   }
   plRows.push([
@@ -128,7 +123,6 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
     pdfCurrency(Math.abs(stats.profit)),
     `${pctOf(stats.totalSales, Math.abs(stats.profit))}%`,
   ]);
-
   const profitLoss: ReportSection = {
     id: 'profit-loss',
     title: 'Profit & Loss',
@@ -136,7 +130,6 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
     headers: ['Line Item', 'Amount', 'Share'],
     rows: plRows,
   };
-
   const salesChannels: ReportSection = {
     id: 'channels',
     title: 'Sales Channels',
@@ -144,18 +137,20 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
     headers: ['Channel', 'Revenue', 'Share'],
     rows: [
       ['In-Store', pdfCurrency(channels.inStore.revenue), `${channels.inStore.share.toFixed(0)}%`],
-      ['Foodpanda', pdfCurrency(channels.foodpanda.revenue), `${channels.foodpanda.share.toFixed(0)}%`],
+      [
+        'Foodpanda',
+        pdfCurrency(channels.foodpanda.revenue),
+        `${channels.foodpanda.share.toFixed(0)}%`,
+      ],
       ['Foodi', pdfCurrency(channels.foodi.revenue), `${channels.foodi.share.toFixed(0)}%`],
     ],
   };
-
   const sections: ReportSection[] = [summary, profitLoss, salesChannels];
-
   if (trendData.length > 0) {
     sections.push({
       id: 'daily-trend',
       title: 'Daily Trend',
-      subtitle: 'Last 7 days — revenue, expenses, and net',
+      subtitle: 'Latest 7 active dates in the selected period — revenue, expenses, and net',
       headers: ['Date', 'Revenue', 'Expenses', 'Daily Net'],
       rows: trendData.map((day) => {
         const net = day.sales - day.expenses;
@@ -168,7 +163,6 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
       }),
     });
   }
-
   return {
     title: 'Financial Report',
     periodLabel: input.periodLabel,
@@ -176,29 +170,28 @@ export function buildReportDocument(input: ReportsExportInput): ReportDocument {
     sections,
   };
 }
-
 /** Flat preview matrix for ExportPreviewModal (CSV / XLSX / PDF). */
 export function getReportPreviewMatrix(input: ReportsExportInput) {
   const doc = buildReportDocument(input);
   const maxCols = Math.max(...doc.sections.map((s) => s.headers.length), 1);
   const headers = ['Section', ...Array.from({ length: maxCols }, (_, i) => `Column ${i + 1}`)];
-  headers.splice(1, maxCols, ...(doc.sections.find((s) => s.headers.length === maxCols)?.headers ?? doc.sections[0].headers));
-
+  headers.splice(
+    1,
+    maxCols,
+    ...(doc.sections.find((s) => s.headers.length === maxCols)?.headers ?? doc.sections[0].headers)
+  );
   const rows: string[][] = [];
   for (const section of doc.sections) {
     for (const row of section.rows) {
       rows.push([section.title, ...row, ...Array(maxCols - row.length).fill('')]);
     }
   }
-
   return { headers, rows, rowCount: rows.length };
 }
-
 function escapeCsvCell(value: string): string {
   if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
   return value;
 }
-
 function documentToSheetRows(doc: ReportDocument): string[][] {
   const aoa: string[][] = [
     [`${BRAND.name} — ${doc.title}`],
@@ -206,25 +199,20 @@ function documentToSheetRows(doc: ReportDocument): string[][] {
     [`Generated: ${doc.generatedAt}`],
     [],
   ];
-
   for (const section of doc.sections) {
     aoa.push([section.title, section.subtitle]);
     aoa.push(section.headers);
     for (const row of section.rows) aoa.push(row);
     aoa.push([]);
   }
-
   return aoa;
 }
-
 function documentToCsv(doc: ReportDocument): string {
   return documentToSheetRows(doc)
     .map((row) => row.map((cell) => escapeCsvCell(cell)).join(','))
     .join('\r\n');
 }
-
 // ─── PDF ──────────────────────────────────────────────────────────────────────
-
 async function getPdf() {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import('jspdf'),
@@ -232,15 +220,12 @@ async function getPdf() {
   ]);
   return { jsPDF, autoTable };
 }
-
 type JsPDFInstance = InstanceType<Awaited<ReturnType<typeof getPdf>>['jsPDF']>;
 type AutoTable = Awaited<ReturnType<typeof getPdf>>['autoTable'];
-
 function applyBrandPages(doc: JsPDFInstance, docTitle: string) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const total = doc.getNumberOfPages();
-
   for (let p = 1; p <= total; p++) {
     doc.setPage(p);
     doc.setFillColor(...BRAND.primary);
@@ -265,7 +250,6 @@ function applyBrandPages(doc: JsPDFInstance, docTitle: string) {
     doc.setTextColor(...BRAND.ink);
   }
 }
-
 const twoColTable = {
   theme: 'grid' as const,
   margin: { top: 22, left: 14, right: 14, bottom: 14 },
@@ -280,7 +264,6 @@ const twoColTable = {
   tableLineColor: BRAND.border,
   tableLineWidth: 0.2,
 } as const;
-
 function sectionTitle(doc: JsPDFInstance, title: string, subtitle: string, y: number) {
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
@@ -292,24 +275,24 @@ function sectionTitle(doc: JsPDFInstance, title: string, subtitle: string, y: nu
   doc.text(subtitle, 14, y + 4.5);
   doc.setTextColor(...BRAND.ink);
 }
-
 function renderSectionTable(
   doc: JsPDFInstance,
   autoTable: AutoTable,
   section: ReportSection,
   startY: number,
-  stats: ERPStats,
+  stats: ERPStats
 ) {
   const profitLabel = stats.profit >= 0 ? 'Net Profit' : 'Net Loss';
   const colCount = section.headers.length;
-
-  const columnStyles: Record<number, { halign?: 'left' | 'right' | 'center'; cellWidth?: number; fontStyle?: 'bold' | 'normal' }> = {
+  const columnStyles: Record<
+    number,
+    { halign?: 'left' | 'right' | 'center'; cellWidth?: number; fontStyle?: 'bold' | 'normal' }
+  > = {
     0: { fontStyle: 'bold', cellWidth: colCount === 2 ? 80 : 95 },
   };
   for (let i = 1; i < colCount; i++) {
     columnStyles[i] = { halign: 'right', cellWidth: colCount === 2 ? 70 : 45 };
   }
-
   autoTable(doc, {
     ...twoColTable,
     head: [section.headers],
@@ -320,7 +303,8 @@ function renderSectionTable(
       if (data.section !== 'body' || section.id !== 'profit-loss') return;
       const row = data.row.raw as string[];
       const label = String(row[0] ?? '');
-      const isSubItem = stats.topProducts.some((p) => p.name === label) ||
+      const isSubItem =
+        stats.topProducts.some((p) => p.name === label) ||
         stats.topFixed.some((f) => f.name === label);
       if (isSubItem) {
         data.cell.styles.fontStyle = 'normal';
@@ -337,14 +321,11 @@ function renderSectionTable(
     },
   });
 }
-
 async function createReportPdfDoc(doc: ReportDocument, stats: ERPStats): Promise<JsPDFInstance> {
   const { jsPDF, autoTable } = await getPdf();
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
   type LastTable = { lastAutoTable: { finalY: number } };
   const lastY = () => (pdf as unknown as LastTable).lastAutoTable?.finalY ?? 40;
-
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'bold');
   pdf.setTextColor(...BRAND.primary);
@@ -357,7 +338,6 @@ async function createReportPdfDoc(doc: ReportDocument, stats: ERPStats): Promise
   pdf.setLineWidth(0.5);
   pdf.line(14, 35, 196, 35);
   pdf.setTextColor(...BRAND.ink);
-
   let y = 42;
   for (let i = 0; i < doc.sections.length; i++) {
     const section = doc.sections[i];
@@ -374,18 +354,14 @@ async function createReportPdfDoc(doc: ReportDocument, stats: ERPStats): Promise
       renderSectionTable(pdf, autoTable, section, y + 8, stats);
     }
   }
-
   applyBrandPages(pdf, doc.title);
   return pdf;
 }
-
 // ─── CSV / XLSX ───────────────────────────────────────────────────────────────
-
 async function getXlsx() {
   const mod = await import('xlsx');
   return (mod as unknown as { default?: typeof mod }).default ?? mod;
 }
-
 async function buildReportCsvBlob(input: ReportsExportInput): Promise<ExportBlobResult> {
   const doc = buildReportDocument(input);
   const csv = documentToCsv(doc);
@@ -396,12 +372,10 @@ async function buildReportCsvBlob(input: ReportsExportInput): Promise<ExportBlob
     format: 'csv',
   };
 }
-
 async function buildReportXlsxBlob(input: ReportsExportInput): Promise<ExportBlobResult> {
   const XLSX = await getXlsx();
   const doc = buildReportDocument(input);
   const aoa = documentToSheetRows(doc);
-
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const colWidths = aoa.reduce<number[]>((widths, row) => {
     row.forEach((cell, i) => {
@@ -410,7 +384,6 @@ async function buildReportXlsxBlob(input: ReportsExportInput): Promise<ExportBlo
     return widths;
   }, []);
   ws['!cols'] = colWidths.map((w) => ({ wch: w }));
-
   const wb = XLSX.utils.book_new();
   wb.Props = {
     Title: doc.title,
@@ -419,7 +392,6 @@ async function buildReportXlsxBlob(input: ReportsExportInput): Promise<ExportBlo
     CreatedDate: new Date(),
   };
   XLSX.utils.book_append_sheet(wb, ws, 'Financial Report');
-
   const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
   return {
     blob: new Blob([buffer], {
@@ -430,7 +402,6 @@ async function buildReportXlsxBlob(input: ReportsExportInput): Promise<ExportBlo
     format: 'xlsx',
   };
 }
-
 async function buildReportPdfBlob(input: ReportsExportInput): Promise<ExportBlobResult> {
   const doc = buildReportDocument(input);
   const pdf = await createReportPdfDoc(doc, input.stats);
@@ -441,13 +412,11 @@ async function buildReportPdfBlob(input: ReportsExportInput): Promise<ExportBlob
     format: 'pdf',
   };
 }
-
 // ─── Public API ───────────────────────────────────────────────────────────────
-
 /** Build report export for any format — PDF, CSV, or XLSX. */
 export async function buildReportExportBlob(
   format: ExportFormat,
-  input: ReportsExportInput,
+  input: ReportsExportInput
 ): Promise<ExportBlobResult> {
   switch (format) {
     case 'pdf':
@@ -458,12 +427,10 @@ export async function buildReportExportBlob(
       return buildReportXlsxBlob(input);
   }
 }
-
 /** @deprecated Use buildReportExportBlob('pdf', input) */
 export async function buildReportsPDFBlob(input: ReportsExportInput): Promise<ExportBlobResult> {
   return buildReportExportBlob('pdf', input);
 }
-
 /** Ready-made PageExportConfig for the Reports page toolbar. */
 export function createReportExportConfig(input: ReportsExportInput) {
   const preview = () => getReportPreviewMatrix(input);

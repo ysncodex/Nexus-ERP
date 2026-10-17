@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
+  CalendarDays,
   X,
   Eye,
   Pencil,
@@ -73,6 +75,18 @@ import { PendingPaymentModal } from '../components/PendingPaymentModal';
 
 type SortField = 'date' | 'amount' | 'items';
 type SortDir = 'asc' | 'desc';
+
+function formatBusinessDateKey(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  if (!year || !month || !day) return dateKey;
+
+  // Build from local date parts at midday to avoid timezone date shifts.
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day, 12));
+}
 
 const STATUS_CONFIG: Record<
   ReceiptStatus,
@@ -303,7 +317,6 @@ function RevenueKpiCard({
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pt-3">
             By Payment Method
           </p>
-
           {total > 0 && (
             <div className="flex h-2 rounded-full overflow-hidden gap-px">
               {PAYMENT_REVENUE_CONFIG.map(({ key, bar }) => {
@@ -319,7 +332,6 @@ function RevenueKpiCard({
               })}
             </div>
           )}
-
           <div className="space-y-2">
             {PAYMENT_REVENUE_CONFIG.map(({ key, label, dot, text }) => {
               const amount = byMethod[key];
@@ -372,6 +384,15 @@ function DetailDrawer({
   const ChannelIcon = channel?.icon;
   const isPending = status === 'pending';
 
+  // Lock page scroll behind the drawer so nothing shifts while it is open.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const handlePrint = async (kind: 'customer' | 'kitchen') => {
     const order = transactionToOrder(tx);
     if (!order) {
@@ -382,13 +403,15 @@ function DetailDrawer({
     if (!ok) toast.error('Pop-up blocked — allow pop-ups and retry');
   };
 
-  return (
+  // Portalled to <body> so the drawer always spans the full viewport height
+  // (no gap at the top from a parent layout offset/transform).
+  return createPortal(
     <>
       {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl flex flex-col overflow-hidden">
+      <div className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-sm flex-col overflow-hidden bg-white shadow-2xl">
         {/* Header */}
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white px-5 pt-5 pb-6 shrink-0">
           <div className="flex items-start justify-between mb-4">
@@ -402,6 +425,8 @@ function DetailDrawer({
               </div>
             </div>
             <button
+              type="button"
+              aria-label="Close"
               onClick={onClose}
               className="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors"
             >
@@ -439,7 +464,7 @@ function DetailDrawer({
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 space-y-4">
           {/* Order Meta */}
           <section>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
@@ -576,37 +601,52 @@ function DetailDrawer({
         </div>
 
         {/* Action footer */}
-        <div className="border-t border-slate-100 p-4 space-y-2 shrink-0 bg-white">
+        <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2 shrink-0 bg-white">
           {isPending && canMutate ? (
-            <button
-              onClick={onReceivePayment}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors"
-            >
-              <Banknote size={15} />
-              Receive Payment
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => void handlePrint('kitchen')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 rounded-xl font-bold text-sm transition-colors"
+              >
+                <UtensilsCrossed size={15} aria-hidden="true" />
+                Kitchen Receipt
+              </button>
+              <button
+                type="button"
+                onClick={onReceivePayment}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition-colors"
+              >
+                <Banknote size={15} aria-hidden="true" />
+                Receive Payment
+              </button>
+            </>
           ) : !isPending ? (
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => void handlePrint('customer')}
                 className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm transition-colors"
               >
                 <Printer size={14} />
-                Receipt Customer
+                Customer Receipt
               </button>
               <button
+                type="button"
                 onClick={() => void handlePrint('kitchen')}
                 className="flex items-center justify-center gap-1.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm transition-colors"
               >
                 <UtensilsCrossed size={14} />
-                Receipt Kitchen
+                Kitchen Receipt
               </button>
             </div>
           ) : null}
+
           {/* ONLY OWNER CAN EDIT OR DELETE */}
           {isOwner && (
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={onEdit}
                 className="flex items-center justify-center gap-1.5 py-2.5 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-semibold text-sm transition-colors"
               >
@@ -614,6 +654,7 @@ function DetailDrawer({
                 Edit Order
               </button>
               <button
+                type="button"
                 onClick={onDelete}
                 className="flex items-center justify-center gap-1.5 py-2.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-sm transition-colors"
               >
@@ -624,7 +665,8 @@ function DetailDrawer({
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
@@ -639,7 +681,7 @@ function DeleteConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
         <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -654,12 +696,14 @@ function DeleteConfirmModal({
         </p>
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={onCancel}
             className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors"
           >
@@ -667,7 +711,8 @@ function DeleteConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -689,6 +734,7 @@ function SortBtn({
   const active = sortField === field;
   return (
     <button
+      type="button"
       onClick={() => onSort(field)}
       className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
         active ? 'text-amber-600' : 'text-slate-500 hover:text-slate-700'
@@ -723,6 +769,7 @@ export default function OrderHistory() {
     refreshFundBalances,
     isLoadingTransactions,
   } = useERP();
+
   const supplierNames = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
 
   // Reuse the ledger already loaded by ERP context instead of issuing a second
@@ -732,6 +779,7 @@ export default function OrderHistory() {
     await refreshTransactions();
     void refreshFundBalances();
   }, [refreshTransactions, refreshFundBalances]);
+
   const loading = isLoadingTransactions;
 
   // ── Filters ──
@@ -751,8 +799,10 @@ export default function OrderHistory() {
       setDateFrom(today);
       setDateTo(today);
     };
+
     window.addEventListener('focus', syncTodayFilter);
     document.addEventListener('visibilitychange', syncTodayFilter);
+
     return () => {
       window.removeEventListener('focus', syncTodayFilter);
       document.removeEventListener('visibilitychange', syncTodayFilter);
@@ -786,6 +836,16 @@ export default function OrderHistory() {
     [navigate]
   );
 
+  // const printKitchenSlip = useCallback(async (tx: Transaction) => {
+  //   const order = transactionToOrder(tx);
+  //   if (!order) {
+  //     toast.error('Cannot print — order line items are missing');
+  //     return;
+  //   }
+  //   const ok = await printOrderAsync(order, 'kitchen');
+  //   if (!ok) toast.error('Pop-up blocked — allow pop-ups and retry');
+  // }, []);
+
   // ── Extract sale transactions ──
   const allSales = useMemo(() => transactions.filter((t) => t.type === 'sale'), [transactions]);
 
@@ -802,6 +862,7 @@ export default function OrderHistory() {
           (t.receiptLines ?? []).some((l) => l.name.toLowerCase().includes(q))
       );
     }
+
     if (statusFilter !== 'all') rows = rows.filter((t) => statusOf(t) === statusFilter);
     if (methodFilter !== 'all') rows = rows.filter((t) => t.method === methodFilter);
     if (channelFilter !== 'all') rows = rows.filter((t) => t.channel === channelFilter);
@@ -835,6 +896,7 @@ export default function OrderHistory() {
     initialPageSize: PAGINATION.ORDER_HISTORY_PAGE_SIZE,
     pageSizeOptions: PAGINATION.ORDER_HISTORY_PAGE_SIZE_OPTIONS,
   });
+
   const { currentPage, totalPages, totalItems } = pagination;
 
   const topOrderId = useMemo(() => findTopOrderId(filtered), [filtered]);
@@ -849,6 +911,7 @@ export default function OrderHistory() {
       const method = t.method ?? 'cash';
       revenueByMethod[method] += t.amount;
     });
+
     const totalRevenue = revenueByMethod.cash + revenueByMethod.bkash + revenueByMethod.bank;
     const avgOrder = active.length ? Math.round(totalRevenue / active.length) : 0;
 
@@ -923,6 +986,7 @@ export default function OrderHistory() {
           tableNumber?: string;
           cashier?: string;
         };
+
         const payload = {
           channel: editable.channel,
           paymentMethod: editable.method,
@@ -951,6 +1015,7 @@ export default function OrderHistory() {
           discountValue: editable.discountValue,
           tax: editable.tax,
         };
+
         const saved = await salesService.update(updated.id, payload);
         if (viewing?.id === saved.id) setViewing(saved);
         setEditing(null);
@@ -986,6 +1051,28 @@ export default function OrderHistory() {
 
   // ── Active filter count ──
   const todayKey = todayBusinessKey();
+  const monthStartKey = `${todayKey.slice(0, 7)}-01`;
+  const selectedDateFrom = dateFrom || todayKey;
+  const selectedDateTo = dateTo || todayKey;
+  const isTodayRange = selectedDateFrom === todayKey && selectedDateTo === todayKey;
+  const isThisMonthRange = selectedDateFrom === monthStartKey && selectedDateTo === todayKey;
+
+  const applyTodayRange = () => {
+    setDatesLockedToToday(true);
+    setDateFrom(todayKey);
+    setDateTo(todayKey);
+  };
+
+  const applyThisMonthRange = () => {
+    setDatesLockedToToday(false);
+    setDateFrom(monthStartKey);
+    setDateTo(todayKey);
+  };
+
+  const togglePendingFilter = () => {
+    setStatusFilter((current) => (current === 'pending' ? 'all' : 'pending'));
+  };
+
   const datesCustomized = dateFrom !== todayKey || dateTo !== todayKey;
 
   const activeFilters = [
@@ -1010,40 +1097,78 @@ export default function OrderHistory() {
       {/* ── Page Header ── */}
       <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Order History</h1>
-          <p className="text-[11px] sm:text-sm text-slate-500 mt-0.5 truncate">
+          <p className="text-sm text-erp-secondary">
             {loading
               ? 'Loading orders from server…'
               : `${filtered.length} orders in range · ${filtered.filter((t) => statusOf(t) === 'completed').length} completed${kpis.pendingCount > 0 ? ` · ${kpis.pendingCount} pending` : ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {activeFilters > 0 && (
-            <button
-              onClick={clearFilters}
-              className="text-[11px] sm:text-xs text-red-500 hover:text-red-600 font-semibold flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 transition-colors whitespace-nowrap"
-            >
-              <X size={12} /> Clear ({activeFilters})
-            </button>
-          )}
-          <button
-            onClick={() => setShowFilters((v) => !v)}
-            className={`flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
-              showFilters || activeFilters > 0
-                ? 'border-amber-400 bg-amber-50 text-amber-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            <SlidersHorizontal size={14} />
-            Filters
-            {activeFilters > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
-                {activeFilters}
-              </span>
-            )}
-          </button>
-        </div>
       </div>
+
+      {/* Persistent date context and one-tap order filters. */}
+      <section
+        aria-label="Order date range and quick filters"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+      >
+        <div className="flex flex-col gap-4 bg-gradient-to-r from-amber-50/70 via-white to-white p-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <CalendarDays size={18} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                Showing orders
+              </p>
+              <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-slate-900 sm:text-base">
+                {formatBusinessDateKey(selectedDateFrom)} – {formatBusinessDateKey(selectedDateTo)}
+              </p>
+            </div>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Quick filters"
+            className="flex flex-wrap items-center gap-1.5 rounded-xl bg-slate-100/80 p-1"
+          >
+            <button
+              type="button"
+              aria-pressed={isTodayRange}
+              onClick={applyTodayRange}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                isTodayRange
+                  ? 'bg-white text-amber-800 shadow-sm ring-1 ring-slate-200'
+                  : 'text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              aria-pressed={isThisMonthRange}
+              onClick={applyThisMonthRange}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                isThisMonthRange
+                  ? 'bg-white text-amber-800 shadow-sm ring-1 ring-slate-200'
+                  : 'text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              This Month
+            </button>
+            <button
+              type="button"
+              aria-pressed={statusFilter === 'pending'}
+              onClick={togglePendingFilter}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                statusFilter === 'pending'
+                  ? 'bg-amber-600 text-white shadow-sm hover:bg-amber-700'
+                  : 'text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Clock size={13} aria-hidden="true" /> Pending
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
@@ -1071,112 +1196,161 @@ export default function OrderHistory() {
         />
       </div>
 
-      {/* ── Search ── */}
-      <div className="relative">
-        <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by order description, customer name, or item..."
-          className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 bg-white shadow-sm text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
-        />
-        {search && (
+      {/* ── Search and filters ── */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative min-w-0 w-full sm:max-w-md lg:max-w-lg">
+          <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            aria-label="Search orders by description, customer, or item"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search orders, customers, or items..."
+            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+          />
+          {search && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearch('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {activeFilters > 0 && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              aria-label={`Clear ${activeFilters} active filters`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 whitespace-nowrap"
+            >
+              <X size={13} /> Clear filters{' '}
+              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px]">
+                {activeFilters}
+              </span>
+            </button>
+          )}
+
           <button
-            onClick={() => setSearch('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            aria-label={showFilters ? 'Close filters' : 'Open filters'}
+            aria-controls="order-history-advanced-filters"
+            className={`inline-flex min-h-10 items-center justify-center gap-2 self-end rounded-lg border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:self-auto ${
+              showFilters || activeFilters > 0
+                ? 'border-amber-300 bg-amber-50 text-amber-900'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+            }`}
           >
-            <X size={15} />
+            <SlidersHorizontal size={15} /> Filters
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── Advanced Filters ── */}
       {showFilters && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-          {/* Status */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as ReceiptStatus | 'all')}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-amber-400 transition-all bg-white"
-            >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="completed">Completed</option>
-              <option value="refunded">Refunded</option>
-              <option value="voided">Voided</option>
-            </select>
+        <section
+          id="order-history-advanced-filters"
+          aria-label="Advanced order filters"
+          className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4"
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-1">
+            <h2 className="text-sm font-semibold text-slate-800">Filter orders</h2>
+            <p className="text-xs text-slate-500">
+              Narrow results by status, payment, channel, or date
+            </p>
           </div>
 
-          {/* Payment */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-              Payment
-            </label>
-            <select
-              value={methodFilter}
-              onChange={(e) => setMethodFilter(e.target.value as PaymentMethod | 'all')}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-amber-400 transition-all bg-white"
-            >
-              <option value="all">All Methods</option>
-              <option value="cash">Cash</option>
-              <option value="bkash">bKash</option>
-              <option value="bank">Card / Bank</option>
-            </select>
-          </div>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {/* Status */}
+            <div className="rounded-lg border border-slate-200 border-l-2 border-l-amber-400 bg-white p-3">
+              <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ReceiptStatus | 'all')}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              >
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="refunded">Refunded</option>
+                <option value="voided">Voided</option>
+              </select>
+            </div>
 
-          {/* Channel */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-              Channel
-            </label>
-            <select
-              value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as SalesChannel | 'all')}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold outline-none focus:border-amber-400 transition-all bg-white"
-            >
-              <option value="all">All Channels</option>
-              <option value="in_store">In-Store</option>
-              <option value="foodpanda">Foodpanda</option>
-              <option value="foodi">Foodi</option>
-            </select>
-          </div>
+            {/* Payment */}
+            <div className="rounded-lg border border-slate-200 border-l-2 border-l-emerald-400 bg-white p-3">
+              <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                Payment
+              </label>
+              <select
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value as PaymentMethod | 'all')}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              >
+                <option value="all">All Methods</option>
+                <option value="cash">Cash</option>
+                <option value="bkash">bKash</option>
+                <option value="bank">Card / Bank</option>
+              </select>
+            </div>
 
-          {/* Date From */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-              From Date
-            </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDatesLockedToToday(false);
-                setDateFrom(e.target.value);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 transition-all"
-            />
-          </div>
+            {/* Channel */}
+            <div className="rounded-lg border border-slate-200 border-l-2 border-l-indigo-400 bg-white p-3">
+              <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                Channel
+              </label>
+              <select
+                value={channelFilter}
+                onChange={(e) => setChannelFilter(e.target.value as SalesChannel | 'all')}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              >
+                <option value="all">All Channels</option>
+                <option value="in_store">In-Store</option>
+                <option value="foodpanda">Foodpanda</option>
+                <option value="foodi">Foodi</option>
+              </select>
+            </div>
 
-          {/* Date To */}
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1.5">
-              To Date
-            </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setDatesLockedToToday(false);
-                setDateTo(e.target.value);
-              }}
-              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 transition-all"
-            />
+            {/* Date From */}
+            <div className="rounded-lg border border-slate-200 border-l-2 border-l-sky-400 bg-white p-3">
+              <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                From Date
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDatesLockedToToday(false);
+                  setDateFrom(e.target.value);
+                }}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+
+            {/* Date To */}
+            <div className="rounded-lg border border-slate-200 border-l-2 border-l-cyan-400 bg-white p-3">
+              <label className="mb-1.5 block text-[11px] font-semibold text-slate-600">
+                To Date
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDatesLockedToToday(false);
+                  setDateTo(e.target.value);
+                }}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* ── Results info ── */}
@@ -1186,6 +1360,7 @@ export default function OrderHistory() {
           Showing <strong className="text-slate-700">{filtered.length}</strong> of{' '}
           <strong className="text-slate-700">{allSales.length}</strong> orders in database
         </span>
+
         <div className="flex items-center gap-3">
           {topOrderId && (
             <span className="hidden sm:inline-flex items-center gap-1 text-violet-600 font-semibold">
@@ -1212,6 +1387,7 @@ export default function OrderHistory() {
             </p>
             {(search || activeFilters > 0) && (
               <button
+                type="button"
                 onClick={clearFilters}
                 className="mt-3 text-sm text-amber-600 hover:text-amber-700 font-semibold"
               >
@@ -1220,8 +1396,9 @@ export default function OrderHistory() {
             )}
           </div>
         ) : (
-          <DataTable>
-            <DataTableColGroup widths={['22%', '14%', '10%', '8%', '11%', '11%', '11%', '13%']} />
+          <DataTable minWidth={1040}>
+            <DataTableColGroup widths={['18%', '13%', '7%', '7%', '10%', '10%', '10%', '25%']} />
+
             <DataTableHead>
               <DataTableHeadRow>
                 <DataTableHeadCell align="left">Order</DataTableHeadCell>
@@ -1262,6 +1439,7 @@ export default function OrderHistory() {
                 <DataTableHeadCell align="center">Actions</DataTableHeadCell>
               </DataTableHeadRow>
             </DataTableHead>
+
             <DataTableBody>
               {paginatedData.map((tx) => {
                 const status = statusOf(tx);
@@ -1282,7 +1460,9 @@ export default function OrderHistory() {
                     onClick={() => setViewing((v) => (v?.id === tx.id ? null : tx))}
                   >
                     <DataTableCell align="left">
-                      <div className="min-w-0">
+                      <div
+                        className={`relative min-w-0 ${isTop ? 'rounded-r-md bg-violet-50/70 px-2 py-1 before:absolute before:-left-3 before:-top-2 before:-bottom-2 before:w-1 before:rounded-full before:bg-violet-500' : ''}`}
+                      >
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-sm font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-none">
                             {orderLabel(tx)}
@@ -1371,29 +1551,43 @@ export default function OrderHistory() {
 
                     <DataTableCell align="center">
                       <div
-                        className="flex items-center justify-center gap-0.5"
+                        className="flex flex-wrap items-center justify-center gap-1"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {status === 'pending' && canMutate && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setViewing(tx);
-                              setPayingOrder(tx);
-                            }}
-                            title="Receive Payment"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-all"
-                          >
-                            <Banknote size={14} />
-                          </button>
+                          <>
+                            {/* <button
+                              type="button"
+                              onClick={() => void printKitchenSlip(tx)}
+                              title="Kitchen Receipt"
+                              aria-label="Kitchen Receipt"
+                              className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50 whitespace-nowrap"
+                            >
+                              <UtensilsCrossed size={14} aria-hidden="true" /> Kitchen Receipt
+                            </button> */}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewing(tx);
+                                setPayingOrder(tx);
+                              }}
+                              title="Receive Payment"
+                              className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 whitespace-nowrap"
+                            >
+                              <Banknote size={14} aria-hidden="true" /> Receive Payment
+                            </button>
+                          </>
                         )}
+
                         <button
                           type="button"
                           onClick={() => setViewing((v) => (v?.id === tx.id ? null : tx))}
+                          aria-label="View order details"
                           title="View details"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                          className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 whitespace-nowrap"
                         >
-                          <Eye size={14} />
+                          <Eye size={14} /> View
                         </button>
 
                         {/* ONLY OWNER CAN SEE TABLE EDIT/DELETE BUTTONS */}
@@ -1403,17 +1597,18 @@ export default function OrderHistory() {
                               type="button"
                               onClick={() => openEdit(tx)}
                               title="Edit"
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all"
+                              className="inline-flex min-h-[30px] items-center justify-center gap-1 rounded-md px-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-amber-50 hover:text-amber-800 whitespace-nowrap"
                             >
-                              <Pencil size={13} />
+                              <Pencil size={13} aria-hidden="true" /> Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => requestDelete(tx)}
                               title="Delete"
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                              aria-label="Delete order"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={13} aria-hidden="true" />
                             </button>
                           </>
                         )}

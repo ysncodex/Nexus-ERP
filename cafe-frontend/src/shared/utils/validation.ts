@@ -36,6 +36,33 @@ export const productCostSchema = z.object({
   description: z.string().max(200).optional(),
 });
 
+// Consumables & Packaging — quantity costing, grouped so cups are not mixed
+// with bags. Mirrors Purchases: user types the total amount paid and the
+// quantity, and the form derives unit price for the ledger row.
+export const consumableSchema = z.object({
+  group: z.string().trim().min(1, 'Group is required').max(50),
+  item: z.string().trim().min(1, 'Item name is required').max(100),
+  supplier: z.string().trim().min(1, 'Supplier is required').max(100),
+  cost: z
+    .string()
+    .min(1, 'Total amount is required')
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+      message: 'Total amount must be positive',
+    }),
+  quantity: z
+    .string()
+    .min(1, 'Quantity is required')
+    .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+      message: 'Quantity must be positive',
+    }),
+  unit: z.enum(['kg', 'g', 'L', 'ml', 'pcs', 'box', 'pack']),
+  // Auto-calculated from cost ÷ quantity; keep as a string in form state so
+  // the readonly input and submission payload stay in sync.
+  unitPrice: z.string().optional(),
+  method: z.enum(['cash', 'bank', 'bkash']),
+  note: z.string().trim().max(200).optional(),
+});
+
 // Fixed Cost Schema
 export const fixedCostSchema = z.object({
   description: z.string().min(1, 'Description is required'),
@@ -77,6 +104,7 @@ export const settingsSchema = z.object({
 // Export types
 export type SaleFormData = z.infer<typeof saleSchema>;
 export type ProductCostFormData = z.infer<typeof productCostSchema>;
+export type ConsumableFormData = z.infer<typeof consumableSchema>;
 export type FixedCostFormData = z.infer<typeof fixedCostSchema>;
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type ManagerPasswordFormData = z.infer<typeof managerPasswordSchema>;

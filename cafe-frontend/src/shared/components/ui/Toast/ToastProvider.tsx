@@ -4,10 +4,12 @@ export function ToastProvider() {
   return (
     <Toaster
       position="top-right"
-      expand={false}
+      expand
       richColors
       closeButton
-      duration={3000}
+      duration={4000}
+      offset={16}
+      style={{ zIndex: 200 }}
       toastOptions={{
         style: {
           background: 'white',

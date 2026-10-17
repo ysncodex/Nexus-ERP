@@ -236,8 +236,9 @@ async function createDashboardPdfDoc(
       ['  Foodpanda Sales', bdt(stats.foodpandaSales)],
       ['  Foodi Sales', bdt(stats.foodiSales)],
       ['Total Expenses', bdt(stats.totalExpenses)],
-      ['  Product Costs', bdt(stats.totalProductCost)],
-      ['  Fixed Costs', bdt(stats.totalFixedCost)],
+      ['  Purchases', bdt(stats.totalProductCost)],
+      ['  Consumables & Packaging', bdt(stats.totalConsumableCost)],
+      ['  Fixed Expenses', bdt(stats.totalFixedCost)],
       ['Gross Profit', bdt(stats.grossProfit)],
       ['Net Profit', bdt(stats.profit)],
       ['Profit Margin', profitMargin],
@@ -271,7 +272,7 @@ async function createDashboardPdfDoc(
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...BRAND.primary);
-    doc.text('Top Product Costs', 14, 26);
+    doc.text('Top Purchases', 14, 26);
     doc.setTextColor(...BRAND.ink);
 
     autoTable(doc, {
@@ -292,7 +293,7 @@ async function createDashboardPdfDoc(
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...BRAND.primary);
-    doc.text('Top Fixed Costs', 14, fixedY);
+    doc.text('Top Fixed Expenses', 14, fixedY);
     doc.setTextColor(...BRAND.ink);
 
     autoTable(doc, {

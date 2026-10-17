@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { sleep, generateId, blockReadOnlyMutation } from '@/shared/utils';
 import {
@@ -20,6 +21,26 @@ import { INTEGRATION_UI } from '@/modules/sales/utils/posSync.constants';
 function getNavigatorOnline(): boolean {
   if (typeof navigator === 'undefined') return true;
   return navigator.onLine;
+}
+
+/**
+ * A failure with no HTTP response means the connection dropped, not that the
+ * server rejected the receipt. Those stay queued for the next upload instead
+ * of being logged as a failed receipt.
+ */
+function isConnectionError(error: unknown): boolean {
+  if (!getNavigatorOnline()) return true;
+  return isAxiosError(error) && !error.response;
+}
+
+/** User-safe reason shown in the Upload errors log. */
+function uploadErrorReason(error: unknown): string {
+  if (isAxiosError<{ message?: unknown }>(error)) {
+    const serverMessage = error.response?.data?.message;
+    if (typeof serverMessage === 'string' && serverMessage.trim()) return serverMessage;
+    if (error.response) return `the server responded ${error.response.status}`;
+  }
+  return error instanceof Error && error.message ? error.message : 'unknown error';
 }
 
 type IngestPendingSale = (row: PendingOfflineInvoice) => void | Promise<void>;
@@ -115,8 +136,31 @@ export function usePosSyncHub(ingestPendingSale: IngestPendingSale) {
           continue;
         }
 
-        await ingestPendingSale(item);
-        successCount += 1;
+        try {
+          await ingestPendingSale(item);
+          successCount += 1;
+        } catch (error: unknown) {
+          if (isConnectionError(error)) {
+            // Connection died mid-upload. Put the receipt back and stop, so it
+            // is retried next time rather than logged as a rejected receipt.
+            queue = [item, ...queue];
+            toast.warning('Upload paused — connection lost.');
+            break;
+          }
+          // The server rejected this receipt. Log it and keep going: the
+          // receipts already uploaded in this run must still leave the queue,
+          // or the next upload would re-send them. Staff can retry a logged
+          // receipt from Upload errors.
+          newFailures.push({
+            id: generateId(),
+            createdAtISO: new Date().toISOString(),
+            orderLabel: item.invoiceNo,
+            message: `Upload failed for ${item.invoiceNo}: ${uploadErrorReason(error)}.`,
+            resolved: false,
+            retryCount: 0,
+            payload: item,
+          });
+        }
       }
 
       const finishedBatch = queue.length === 0;
