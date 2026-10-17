@@ -1,6 +1,10 @@
-# Beans & Butter — Cafe ERP
+# Nexus ERP V3 — Beans & Butter Café
 
-Full-stack point-of-sale and operations dashboard for **Beans & Butter** cafe.
+Full-stack point-of-sale and operations system for **Beans & Butter Café**.
+
+**Version:** V3.0
+
+V3 keeps the existing sales, expense, fund, and reporting behavior and adds clearer navigation, drawer-based entry on updated screens, consumables and packaging, staff schedule, and payroll.
 
 | Package | Stack | Role |
 | -------- | ----- | ---- |
@@ -40,6 +44,22 @@ App runs at `http://localhost:5173`.
 
 ---
 
+## Modules
+
+| Area | Screens |
+| ---- | ------- |
+| Overview | Dashboard, Manager Dashboard, Financial Report, Product Sales |
+| Orders | New Order, Order History, Sales Sync |
+| Products | Products |
+| Expenses | All Expenses, Purchases, Consumables & Packaging, Fixed Expenses |
+| Accounts | Daily Summary, Cash & Accounts, Delivery Payouts |
+| Suppliers | Suppliers |
+| People | Staff Schedule, Payroll |
+
+Older dashboard bookmarks still open the current pages. Examples: `/dashboard/reports` goes to Financial Report, and `/dashboard/fund` goes to Cash & Accounts.
+
+---
+
 ## Business timezone
 
 All reporting uses **Asia/Dhaka (UTC+6)** as the business day, regardless of server or device timezone.
@@ -56,8 +76,10 @@ Helpers live in `cafe-frontend/src/shared/utils/businessDate.ts` and `cafe-backe
 
 | Role | Access |
 | ---- | ------ |
-| **Owner** | Full access |
-| **Manager** | Operations + manager PIN for sensitive edits |
+| **Owner** | Full café access — orders, expenses, accounts, suppliers, people, and reports. The Manager Dashboard is manager-only. |
+| **Manager** | Floor operations — orders, products, purchases, consumables, and fixed expenses. |
+
+Staff Schedule and Payroll are owner-only on both the UI and `GET/POST /api/hr`.
 
 Passwords are **never stored in source code**. Set them in environment variables:
 
@@ -79,6 +101,8 @@ Production sign-in uses JWT from the backend API.
 | Database | Neon PostgreSQL | `DATABASE_URL` on backend |
 
 After backend deploy: `npm run db:deploy` then `npm run db:seed` (once per environment).
+
+Apply pending migrations before using Consumables & Packaging or Staff Schedule / Payroll. Those features depend on the HR, consumable, and consumable-group migrations.
 
 ---
 
@@ -103,19 +127,20 @@ npm run lint
 
 ---
 
-## Security & GitHub
+## Security
 
 - `.env` files are gitignored — **never commit** real credentials.
 - Passwords belong only in `.env` (local) or host environment variables (production).
 - If secrets were ever pushed to GitHub, rotate `DATABASE_URL`, `JWT_SECRET`, and login passwords immediately.
 - Use `.env.example` files as templates with placeholder values only.
+- Local agent notes (`AGENTS.md`, `AI-AGENT-USAGE.md`, `.agents/`, `.cursor/`, `.github/instructions/`, `.github/skills/`) stay on the machine and are gitignored.
 
 ---
 
 ## Project layout
 
 ```text
-BeansAndButter/
+Nexus-ERP/
 ├── cafe-frontend/     # React SPA (POS + ERP UI)
 ├── cafe-backend/      # Express API + Prisma
 ├── README.md          # This file

@@ -1,6 +1,6 @@
-# Cafe ERP — Frontend
+# Nexus ERP V3 — Frontend
 
-React single-page app for POS, order history, expenses, funds, inventory, and reports at **Beans & Butter**.
+React single-page app for POS, order history, expenses, funds, inventory, staff, and reports at **Beans & Butter Café**.
 
 Pairs with [`cafe-backend`](../cafe-backend/) for production. Supports optional offline fallback when the API is unreachable.
 
@@ -38,11 +38,14 @@ Passwords are never hardcoded in source — only in `.env` (gitignored) or host 
 
 - **POS / New Order** — menu grid, cart, discounts, gifts, payment panel
 - **Order History** — today-only by default; date filters for history
-- **Dashboard** — sales, costs, liquidity KPIs (today by default)
-- **Expenses** — product and fixed costs
-- **Funds** — cash/bank/bKash movements
-- **Reports** — daily, monthly, P&L, CSV export
-- **Roles** — owner, manager (with PIN)
+- **Sales Sync** — uploaded sales, offline queue, and delivery-app sync
+- **Dashboard** — owner sales, costs, and liquidity KPIs (today by default)
+- **Manager Dashboard** — shift metrics, cash/bKash, and recent orders
+- **Expenses** — all expenses, purchases, consumables and packaging, fixed expenses
+- **Accounts** — daily summary, cash/bank/bKash, delivery payouts
+- **People** — staff schedule and payroll (owner only)
+- **Reports** — financial report, product sales, PDF/CSV/XLSX export
+- **Roles** — owner (full access), manager (orders, products, purchases, consumables, fixed expenses)
 
 ---
 
@@ -85,7 +88,7 @@ cafe-frontend/
 ├── public/                 # Static assets, SPA redirects
 ├── src/
 │   ├── features/auth/      # Login
-│   ├── modules/            # sales, finance, inventory, reports
+│   ├── modules/            # sales, finance, inventory, hr, reports
 │   ├── core/
 │   │   ├── api/            # Axios client + services
 │   │   ├── context/        # ERPContext, filters, stats
