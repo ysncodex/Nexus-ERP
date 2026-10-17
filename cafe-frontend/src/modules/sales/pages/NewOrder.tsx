@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, memo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import {
   Search,
   X,
@@ -115,7 +115,9 @@ const OrderProductCard = memo(function OrderProductCard({
     <button
       type="button"
       onClick={() => onAdd(item)}
-      className={`w-full flex items-center gap-3 text-left bg-white rounded-xl border px-3 py-2.5 transition-all duration-150 select-none group relative
+      aria-label={`Add ${item.name}, ৳${item.price}${qty > 0 ? `, ${qty} in cart` : ''}`}
+      title={item.name}
+      className={`w-full min-h-[88px] flex items-center gap-3 text-left bg-white rounded-xl border p-3.5 transition-all duration-150 motion-reduce:transition-none active:scale-[0.985] motion-reduce:active:scale-100 select-none group relative shadow-sm
         ${
           qty > 0
             ? 'border-amber-400 ring-2 ring-amber-100 shadow-sm'
@@ -130,15 +132,15 @@ const OrderProductCard = memo(function OrderProductCard({
 
       <div className="flex-1 min-w-0">
         <CategoryDot category={item.category} />
-        <p className="text-[13px] font-bold text-slate-800 mt-1 leading-snug truncate">
+        <p className="line-clamp-2 whitespace-normal break-words text-sm font-bold text-slate-800 mt-1 leading-snug">
           {item.name}
         </p>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex flex-col items-center gap-1.5 shrink-0">
         <span className="text-sm font-bold text-slate-800 tabular-nums">৳{item.price}</span>
         <span
-          className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all
+          className={`w-[30px] h-[30px] rounded-full border flex items-center justify-center transition-all
           ${
             qty > 0
               ? 'bg-amber-500 border-amber-500 text-white'
@@ -178,12 +180,41 @@ const CartItemRow = memo(function CartItemRow({
 
   return (
     <div
-      className={`flex flex-col gap-1 py-2.5 border-b border-slate-100 last:border-0 group ${isGift ? 'bg-emerald-50/50 -mx-1 px-1 rounded-lg' : ''}`}
+      className={`flex flex-col gap-1 py-2 [@media(max-width:480px)]:[&_button]:min-w-6 [@media(max-width:480px)]:[&_button]:w-6 [@media(max-width:480px)]:[&_button]:h-6 [@media(max-width:480px)]:[&_button]:p-1 [&_button]:opacity-100 [&_button]:min-w-7 [&_button]:w-7 [&_button]:h-7 [&_button]:p-1.5 border-b border-slate-100 last:border-0 group ${isGift ? 'bg-emerald-50/50 -mx-1 px-1 rounded-lg' : ''}`}
     >
-      <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 [@media(max-width:480px)]:gap-1">
+        <div className="flex items-center gap-1.5 [@media(max-width:480px)]:gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={onAddAddon}
+            title="Add Extra"
+            aria-label={`Add extra to ${item.name}`}
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-500 transition-all"
+          >
+            <Plus size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleGift}
+            title={isGift ? 'Remove gift' : 'Mark as gift'}
+            aria-label={`${isGift ? 'Remove gift from' : 'Mark as gift:'} ${item.name}`}
+            aria-pressed={!!isGift}
+            className={`p-1.5 rounded-lg border transition-all ${
+              isGift
+                ? 'border-emerald-400 bg-emerald-100 text-emerald-600'
+                : 'border-slate-200 text-slate-500 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-500'
+            }`}
+          >
+            <Gift size={12} />
+          </button>
+        </div>
+
+        <div className="min-w-0 pl-1 [@media(max-width:480px)]:pl-0">
           <div className="flex items-center gap-1.5">
-            <p className="text-[13px] font-semibold text-slate-800 leading-snug truncate">
+            <p
+              title={item.name}
+              className="min-w-0 truncate [@media(max-width:480px)]:whitespace-normal [@media(max-width:480px)]:line-clamp-2 [@media(max-width:480px)]:break-words text-[13px] font-semibold text-slate-800 leading-snug"
+            >
               {item.name}
             </p>
             {isGift && (
@@ -192,7 +223,7 @@ const CartItemRow = memo(function CartItemRow({
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="truncate text-[10px] text-slate-500">
             {isGift ? `Was ৳${item.price} · now free` : `৳${item.price} base`}
           </p>
         </div>
@@ -200,49 +231,34 @@ const CartItemRow = memo(function CartItemRow({
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            onClick={onAddAddon}
-            title="Add Extra"
-            className="p-1.5 rounded-lg border border-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-500 transition-all"
-          >
-            <Plus size={12} />
-          </button>
-          <button
-            type="button"
-            onClick={onToggleGift}
-            title={isGift ? 'Remove gift' : 'Mark as gift'}
-            className={`p-1.5 rounded-lg border transition-all ${
-              isGift
-                ? 'border-emerald-400 bg-emerald-100 text-emerald-600'
-                : 'border-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-500'
-            }`}
-          >
-            <Gift size={12} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0 ml-1">
-          <button
+            aria-label={`Decrease quantity of ${item.name}`}
             onClick={onDecrement}
-            className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-all"
+            className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-all"
           >
             <Minus size={11} />
           </button>
-          <span className="text-sm font-bold text-slate-800 w-5 text-center">{quantity}</span>
+          <span className="text-xs font-bold text-slate-800 min-w-4 text-center tabular-nums">
+            {quantity}
+          </span>
           <button
+            type="button"
+            aria-label={`Increase quantity of ${item.name}`}
             onClick={onIncrement}
-            className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-slate-400 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 transition-all"
+            className="w-6 h-6 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 transition-all"
           >
             <Plus size={11} />
           </button>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[13px] font-bold text-slate-800 w-14 text-right tabular-nums">
+          <span className="text-xs font-bold text-slate-800 min-w-10 [@media(max-width:480px)]:min-w-8 whitespace-nowrap text-right tabular-nums">
             {isGift ? 'FREE' : `৳${baseTotal}`}
           </span>
           <button
+            type="button"
+            aria-label={`Remove ${item.name}`}
             onClick={onRemove}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-all"
+            className="p-1 rounded hover:bg-red-50 text-slate-500 hover:text-red-400 transition-all"
           >
             <Trash2 size={12} />
           </button>
@@ -260,8 +276,10 @@ const CartItemRow = memo(function CartItemRow({
               <div className="flex items-center gap-2">
                 <span className="font-semibold">+ ৳{isGift ? 0 : addon.price * quantity}</span>
                 <button
+                  type="button"
+                  aria-label={`Remove ${addon.name} from ${item.name}`}
                   onClick={() => onRemoveAddon(idx)}
-                  className="text-slate-300 hover:text-red-400 p-0.5 rounded"
+                  className="text-slate-500 hover:text-red-400 p-0.5 rounded"
                 >
                   <X size={10} />
                 </button>
@@ -739,9 +757,80 @@ function UpdateOrderModal({
   );
 }
 
+/** Fit this page below the dashboard header without guessing its height.
+ * Only presentation sizing is changed; no global scrolling styles are modified.
+ */
+function useOrderViewport() {
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+    let frame = 0;
+    let lastHeight = -1;
+
+    const measure = () => {
+      const viewport = window.visualViewport;
+      const viewportBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+      let top = page.getBoundingClientRect().top;
+      let bottomSpace = 12;
+
+      // Include shell padding and normalize any pre-existing ancestor scroll.
+      for (let parent = page.parentElement; parent; parent = parent.parentElement) {
+        top += parent.scrollTop;
+        const styles = window.getComputedStyle(parent);
+        bottomSpace += parseFloat(styles.paddingBottom) || 0;
+      }
+      const height = Math.max(0, Math.floor(viewportBottom - top - bottomSpace));
+      // Small viewports need document flow so wrapped categories and forms remain reachable.
+      const items = page.querySelector<HTMLElement>('[data-pos-items]');
+      const cart = items?.parentElement;
+      const form = items?.nextElementSibling as HTMLElement | null;
+      const checkout = form?.nextElementSibling as HTMLElement | null;
+      const controlsHeight =
+        cart && cart.getClientRects().length
+          ? (cart.firstElementChild as HTMLElement).offsetHeight +
+            (form?.offsetHeight ?? 0) +
+            (checkout?.offsetHeight ?? 0) +
+            128
+          : 0;
+      page.dataset.posFlow =
+        height < Math.max(560, controlsHeight) || page.clientWidth < 420 ? 'true' : 'false';
+      if (height !== lastHeight) {
+        page.style.setProperty('--order-page-height', `${height}px`);
+        lastHeight = height;
+      }
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    const observer = new ResizeObserver(schedule);
+    if (page.parentElement) observer.observe(page.parentElement);
+    const items = page.querySelector('[data-pos-items]');
+    if (items?.nextElementSibling) observer.observe(items.nextElementSibling);
+    if (items?.nextElementSibling?.nextElementSibling) {
+      observer.observe(items.nextElementSibling.nextElementSibling);
+    }
+    window.addEventListener('resize', schedule);
+    window.visualViewport?.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', schedule);
+      window.visualViewport?.removeEventListener('resize', schedule);
+    };
+  }, []);
+
+  return pageRef;
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function NewOrder() {
+  const pageRef = useOrderViewport();
   const canMutate = useCanMutate();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -788,11 +877,11 @@ export default function NewOrder() {
   const [mobileView, setMobileView] = useState<'menu' | 'cart'>('menu');
   const [currentPage, setCurrentPage] = useState(1);
   const [isDesktopView, setIsDesktopView] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches
   );
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
+    const mq = window.matchMedia('(min-width: 1280px)');
     const handleChange = (e: MediaQueryListEvent) => setIsDesktopView(e.matches);
     mq.addEventListener('change', handleChange);
     return () => mq.removeEventListener('change', handleChange);
@@ -1095,7 +1184,7 @@ export default function NewOrder() {
   const orderSavedMessage = useCallback(
     (order: NewOrderData, status: 'completed' | 'pending', result: 'posted' | 'queued') => {
       if (result === 'queued') {
-        return `Order ${order.orderNumber} saved offline — sync from POS Sync when online`;
+        return `Order ${order.orderNumber} saved offline — sync from Sales Sync when online`;
       }
       if (status === 'completed') {
         return `Order ${order.orderNumber} completed · ৳${order.total}`;
@@ -1211,9 +1300,12 @@ export default function NewOrder() {
   const showMobileCartBar = mobileView === 'menu' && totalItems > 0;
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 lg:h-[calc(100dvh-140px)] lg:min-h-[600px]">
-      {(!isOnline || pendingOrders.length > 0 || editingSale) && (
-        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+    <div
+      ref={pageRef}
+      className="[&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-amber-600 [&_button:focus-visible]:outline-offset-2 flex flex-col gap-3 min-h-0 min-w-0 h-[var(--order-page-height,60dvh)] overflow-hidden [&[data-pos-flow=true]]:h-auto [&[data-pos-flow=true]]:overflow-visible [&[data-pos-flow=true]_[data-pos-workspace]]:flex-none [&[data-pos-flow=true]_[data-pos-workspace]]:overflow-visible [&[data-pos-flow=true]_[data-pos-catalog]]:flex-none [&[data-pos-flow=true]_[data-pos-catalog]]:xl:flex-[3] [&[data-pos-flow=true]_[data-pos-catalog]]:overflow-visible [&[data-pos-flow=true]_[data-pos-products]]:flex-none [&[data-pos-flow=true]_[data-pos-products]]:overflow-visible [&[data-pos-flow=true]_[data-pos-cart]]:h-auto [&[data-pos-flow=true]_[data-pos-cart]]:self-start [&[data-pos-flow=true]_[data-pos-cart]]:max-h-none [&[data-pos-flow=true]_[data-pos-items]]:flex-none [&[data-pos-flow=true]_[data-pos-items]]:h-56 [&[data-pos-flow=true]_[data-pos-mobile-bar]]:sticky [&[data-pos-flow=true]_[data-pos-mobile-bar]]:bottom-2"
+    >
+      {(!isOnline || editingSale) && (
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0 max-h-[25%] overflow-y-auto">
           {!isOnline && (
             <div
               role="status"
@@ -1222,7 +1314,7 @@ export default function NewOrder() {
               <WifiOff size={16} className="shrink-0 text-amber-700" />
               <span>
                 <strong>Offline mode</strong> — orders are saved locally and upload from{' '}
-                <strong>POS Sync</strong> when Wi-Fi returns.
+                <strong>Sales Sync</strong> when Wi-Fi returns.
                 {offlineQueueCount > 0 && (
                   <span className="ml-1 font-semibold">({offlineQueueCount} waiting)</span>
                 )}
@@ -1251,12 +1343,25 @@ export default function NewOrder() {
               </button>
             </div>
           )}
+        </div>
+      )}
 
+      <div
+        data-pos-workspace
+        className="min-w-0 flex flex-col xl:flex-row gap-4 flex-1 min-h-0 overflow-hidden"
+      >
+        {/* ── LEFT: Product Browser (60%) ── */}
+        <div
+          data-pos-catalog
+          className={`flex-[3] xl:basis-0 min-w-0 flex-col gap-3 overflow-hidden min-h-0 ${
+            mobileView === 'menu' ? 'flex' : 'hidden xl:flex'
+          }`}
+        >
           {pendingOrders.length > 0 && (
             <button
               type="button"
               onClick={() => setPendingDrawerOpen(true)}
-              className="shrink-0 flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-100 hover:bg-amber-200/80 px-4 py-2.5 text-sm font-bold text-amber-800 transition-colors"
+              className="self-start shrink-0 flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-100 hover:bg-amber-200/80 px-4 py-2.5 text-sm font-bold text-amber-800 transition-colors"
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
@@ -1265,20 +1370,12 @@ export default function NewOrder() {
               Pending Orders ({pendingOrders.length})
             </button>
           )}
-        </div>
-      )}
-
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-        {/* ── LEFT: Product Browser (60%) ── */}
-        <div
-          className={`flex-[3] min-w-0 flex-col gap-3 overflow-hidden min-h-[280px] lg:min-h-0 ${
-            mobileView === 'menu' ? 'flex' : 'hidden lg:flex'
-          }`}
-        >
           <div className="shrink-0">
-            <h1 className="text-xl font-bold text-slate-800">Order Item List</h1>
-            <p className="text-xs text-slate-500">
-              {catalogLoading ? 'Loading menu from server…' : 'Select items to add to the order'}
+            <h1 className="text-lg font-bold tracking-tight text-slate-900">Add items</h1>
+            <p className="text-xs text-erp-secondary">
+              {catalogLoading
+                ? 'Loading menu…'
+                : `${filteredCatalog.length} products · Tap to add to your order`}
             </p>
           </div>
 
@@ -1290,11 +1387,13 @@ export default function NewOrder() {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search products by name or category"
               placeholder="Search products by name..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-white text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-white text-base sm:text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
             />
             {searchQuery && (
               <button
+                aria-label="Clear product search"
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
@@ -1303,12 +1402,16 @@ export default function NewOrder() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-1.5 shrink-0">
+          <div
+            className="flex flex-wrap gap-1.5 shrink-0 pb-1 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:break-words [&_button]:min-h-[34px] [&_button]:py-1.5 [@media(pointer:coarse)]:[&_button]:min-h-10"
+            aria-label="Product categories"
+          >
             <button
+              aria-pressed={selectedCategory === 'All'}
               onClick={() => setSelectedCategory('All')}
               className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                 selectedCategory === 'All'
-                  ? 'bg-amber-400 text-white shadow-sm'
+                  ? 'bg-amber-100 text-amber-800 shadow-sm'
                   : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
               }`}
             >
@@ -1320,6 +1423,7 @@ export default function NewOrder() {
               return (
                 <button
                   key={cat}
+                  aria-pressed={isActive}
                   onClick={() => setSelectedCategory(cat)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
                     isActive
@@ -1333,9 +1437,12 @@ export default function NewOrder() {
             })}
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
+          <div
+            data-pos-products
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain custom-scrollbar pr-1 [scrollbar-gutter:stable]"
+          >
             {filteredCatalog.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-2 pb-4">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] content-start gap-2.5 pt-2 pl-2 pr-1 pb-5">
                 {productsToShow.map((item) => (
                   <OrderProductCard
                     key={item.id}
@@ -1348,7 +1455,9 @@ export default function NewOrder() {
             ) : (
               <div className="flex flex-col items-center justify-center h-40 text-center">
                 <Package2 size={36} className="text-slate-300 mb-2" />
-                <p className="text-sm font-semibold text-slate-500">No items found</p>
+                <p className="text-sm font-semibold text-slate-500">
+                  {catalogLoading ? 'Loading menu…' : 'No items found'}
+                </p>
               </div>
             )}
           </div>
@@ -1380,44 +1489,61 @@ export default function NewOrder() {
 
         {/* ── RIGHT: Order Cart (40%) ── */}
         <div
-          className={`w-full lg:flex-[2] lg:min-w-[280px] xl:min-w-[320px] shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex-col overflow-hidden min-h-[360px] max-h-[70dvh] lg:max-h-none lg:min-h-0 ${
-            mobileView === 'cart' ? 'flex' : 'hidden lg:flex'
+          data-pos-cart
+          className={`h-full max-h-full w-full min-w-0 xl:min-w-[340px] xl:flex-[2] xl:basis-0 shrink min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex-col overflow-hidden ${
+            mobileView === 'cart' ? 'flex' : 'hidden xl:flex'
           }`}
         >
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
+          <div className="px-4 max-[480px]:px-2 py-3 [@media(max-height:700px)]:py-2 border-b border-slate-100 bg-slate-50 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setMobileView('menu')}
-                className="lg:hidden -ml-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors"
+                className="xl:hidden -ml-1.5 p-1.5 rounded-lg text-slate-500 hover:bg-slate-200/60 transition-colors"
                 aria-label="Back to menu"
               >
                 <ArrowLeft size={16} />
               </button>
-              <ShoppingCart size={16} className="text-slate-600" />
-              <span className="font-bold text-slate-800 text-sm">Current Order</span>
+              <ShoppingCart size={18} className="text-emerald-600 max-[480px]:hidden" />
+              <span className="whitespace-nowrap font-bold text-slate-900 text-sm">
+                Current Order
+              </span>
               {totalItems > 0 && (
-                <span className="bg-amber-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold min-w-6 px-1 h-6 rounded-full flex items-center justify-center">
                   {totalItems}
                 </span>
               )}
             </div>
             {orderItems.length > 0 && (
               <button
+                type="button"
+                aria-label="Clear cart"
                 onClick={clearCart}
                 className="text-xs text-red-400 hover:text-red-500 font-semibold flex items-center gap-1 transition-colors"
               >
-                <Trash2 size={11} /> Clear
+                <Trash2 size={13} />{' '}
+                <span className="whitespace-nowrap">
+                  Clear<span className="max-[480px]:hidden"> cart</span>
+                </span>
               </button>
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-4">
+          {/* Only selected items scroll. The form and checkout are fixed siblings. */}
+          <div
+            data-pos-items
+            role="region"
+            aria-label="Selected order items"
+            tabIndex={0}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] custom-scrollbar px-4 max-[480px]:px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-amber-500"
+          >
             {orderItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <ShoppingCart size={38} className="text-slate-200 mb-3" />
-                <p className="text-sm font-semibold text-slate-400">Cart is empty</p>
-                <p className="text-xs text-slate-300 mt-1">Tap products to add them</p>
+              <div className="min-h-24 flex items-center justify-center gap-3 text-left py-5">
+                <ShoppingCart size={28} className="text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Start your order</p>
+                  <p className="text-xs text-slate-500 mt-1">Tap a product to add it here</p>
+                </div>
               </div>
             ) : (
               orderItems.map((oi) => (
@@ -1435,7 +1561,10 @@ export default function NewOrder() {
             )}
           </div>
 
-          <div className="border-t border-slate-100 p-3.5 space-y-3 shrink-0">
+          <div className="shrink-0 bg-white [&_input]:min-h-9 [&_input]:text-base sm:[&_input]:text-[13px] [&_select]:min-h-9 [&_select]:text-base sm:[&_select]:text-[13px] [&_button]:min-h-9 border-t border-slate-100 px-3.5 pt-2.5 pb-2 space-y-2 [@media(max-height:700px)]:space-y-1.5 [@media(max-height:700px)]:[&_input]:min-h-8 [@media(max-height:700px)]:[&_select]:min-h-8 [@media(max-height:700px)]:[&_button]:min-h-8 [@media(max-height:700px)]:[&_input]:py-1.5 [@media(max-height:700px)]:[&_select]:py-1.5 [@media(max-height:700px)]:[&_button]:py-1.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Order details
+            </p>
             <div className="grid grid-cols-3 gap-1.5">
               {(
                 [
@@ -1446,8 +1575,10 @@ export default function NewOrder() {
               ).map(({ val, label, Icon }) => (
                 <button
                   key={val}
+                  aria-pressed={channel === val}
+                  type="button"
                   onClick={() => setChannel(val)}
-                  className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
                     channel === val
                       ? 'border-amber-400 bg-amber-50 text-amber-700'
                       : 'border-slate-200 text-slate-500 hover:border-slate-300'
@@ -1460,38 +1591,15 @@ export default function NewOrder() {
             </div>
 
             {channel === 'delivery' && (
-              <div className="grid grid-cols-2 gap-1.5 -mt-1.5">
-                {(
-                  [
-                    { val: 'foodpanda', label: 'Foodpanda', dot: 'bg-orange-400' },
-                    { val: 'foodi', label: 'Foodi', dot: 'bg-violet-400' },
-                  ] as const
-                ).map(({ val, label, dot }) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setDeliveryPlatform(val)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
-                      deliveryPlatform === val
-                        ? 'border-amber-400 bg-amber-50 text-amber-700'
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-            {channel === 'delivery' && (
-              <p className="text-[10px] text-slate-400 leading-relaxed -mt-1">
-                Use this for delivery tickets taken at the till. Platform payouts
-                (Foodpanda/Foodi invoices) belong on Delivery Settlements — recording both for
-                the same invoice would double-count that channel.
+              <p
+                title="Use this for delivery tickets taken at the till. Record platform invoice payouts in Delivery Payouts to avoid double-counting."
+                className="text-[10px] text-slate-500 leading-relaxed -mt-1"
+              >
+                Till tickets only. Platform payouts → Delivery Payouts.
               </p>
             )}
 
-            <div className={needsTable ? 'grid grid-cols-2 gap-2' : ''}>
+            <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-2">
               <div className="relative">
                 <User
                   size={12}
@@ -1500,10 +1608,39 @@ export default function NewOrder() {
                 <input
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
+                  aria-label="Customer name (optional)"
                   placeholder="Customer (optional)"
-                  className="w-full pl-7 pr-2 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                  className="w-full min-w-0 pl-7 pr-2 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
                 />
               </div>
+
+              {channel === 'delivery' && (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(
+                    [
+                      { val: 'foodpanda', label: 'Foodpanda', dot: 'bg-orange-400' },
+                      { val: 'foodi', label: 'Foodi', dot: 'bg-violet-400' },
+                    ] as const
+                  ).map(({ val, label, dot }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      aria-pressed={deliveryPlatform === val}
+                      onClick={() => setDeliveryPlatform(val)}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+                        deliveryPlatform === val
+                          ? 'border-amber-400 bg-amber-50 text-amber-700'
+                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 [@media(max-height:700px)]:hidden ${dot}`}
+                      />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {needsTable && (
                 <div className="relative">
@@ -1512,9 +1649,12 @@ export default function NewOrder() {
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
                   />
                   <select
+                    aria-label="Table (required)"
+                    aria-invalid={tableMissing}
+                    aria-describedby={tableMissing ? 'pos-table-hint' : undefined}
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
-                    className={`w-full pl-2.5 pr-7 py-2 rounded-xl border text-xs outline-none transition-all appearance-none bg-white ${
+                    className={`w-full min-w-0 pl-2.5 pr-7 py-2 rounded-xl border text-xs outline-none transition-all appearance-none bg-white ${
                       tableMissing
                         ? 'border-red-300 text-red-600 focus:border-red-400 focus:ring-2 focus:ring-red-100'
                         : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'
@@ -1532,74 +1672,101 @@ export default function NewOrder() {
             </div>
 
             {tableMissing && (
-              <p className="flex items-center gap-1 text-[11px] text-red-500 font-medium -mt-1">
+              <p
+                id="pos-table-hint"
+                className="flex items-center gap-1 text-[11px] text-red-500 font-medium -mt-1"
+              >
                 <AlertCircle size={11} /> Table selection is required for {CHANNEL_LABELS[channel]}
               </p>
             )}
 
-            <div className="grid grid-cols-3 gap-1.5">
-              {(
-                [
-                  { val: 'cash', label: 'Cash', Icon: Banknote },
-                  { val: 'bkash', label: 'bKash', Icon: Smartphone },
-                  { val: 'bank', label: 'Card', Icon: Landmark },
-                ] as const
-              ).map(({ val, label, Icon }) => (
-                <button
-                  key={val}
-                  onClick={() => setPaymentMethod(val)}
-                  className={`flex items-center justify-center gap-1 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-                    paymentMethod === val
-                      ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                  }`}
-                >
-                  <Icon size={12} />
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-stretch gap-2">
-              <div className="flex rounded-xl border border-slate-200 overflow-hidden shrink-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Payment &amp; discount
+            </p>
+            <div className="grid gap-2 [@media(min-width:640px)_and_(max-height:700px)]:grid-cols-2 [@media(max-height:700px)]:gap-1.5">
+              <select
+                aria-label="Payment method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
+                className="hidden [@media(min-width:640px)_and_(max-height:700px)]:block w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              >
+                <option value="cash">Cash</option>
+                <option value="bkash">bKash</option>
+                <option value="bank">Card</option>
+              </select>
+              <div className="grid grid-cols-3 gap-1.5 [@media(min-width:640px)_and_(max-height:700px)]:hidden">
                 {(
                   [
-                    { val: 'flat', label: '৳' },
-                    { val: 'percent', label: '%' },
+                    { val: 'cash', label: 'Cash', Icon: Banknote },
+                    { val: 'bkash', label: 'bKash', Icon: Smartphone },
+                    { val: 'bank', label: 'Card', Icon: Landmark },
                   ] as const
-                ).map(({ val, label }) => (
+                ).map(({ val, label, Icon }) => (
                   <button
                     key={val}
+                    aria-pressed={paymentMethod === val}
                     type="button"
-                    onClick={() => setDiscountType(val)}
-                    className={`w-9 text-sm font-bold transition-all ${
-                      discountType === val
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-white text-slate-500 hover:bg-slate-50'
+                    onClick={() => setPaymentMethod(val)}
+                    className={`flex items-center justify-center gap-1 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
+                      paymentMethod === val
+                        ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
                     }`}
                   >
+                    <Icon size={12} className="[@media(max-height:700px)]:hidden" />
                     {label}
                   </button>
                 ))}
               </div>
-              <div className="relative flex-1">
-                <Tag
-                  size={12}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  max={discountType === 'percent' ? 100 : undefined}
-                  value={discountStr}
-                  onChange={(e) => setDiscountStr(e.target.value)}
-                  placeholder={discountType === 'percent' ? 'Discount %' : 'Discount amount'}
-                  className="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
-                />
+
+              <div className="flex items-stretch gap-2">
+                <div className="flex rounded-xl border border-slate-200 overflow-hidden shrink-0">
+                  {(
+                    [
+                      { val: 'flat', label: '৳' },
+                      { val: 'percent', label: '%' },
+                    ] as const
+                  ).map(({ val, label }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      aria-pressed={discountType === val}
+                      onClick={() => setDiscountType(val)}
+                      className={`w-9 [@media(max-height:700px)]:w-7 text-sm font-bold transition-all ${
+                        discountType === val
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-white text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative flex-1 min-w-0">
+                  <Tag
+                    size={12}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none [@media(max-height:700px)]:hidden"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max={discountType === 'percent' ? 100 : undefined}
+                    aria-label={
+                      discountType === 'percent' ? 'Discount percentage' : 'Discount amount in taka'
+                    }
+                    value={discountStr}
+                    onChange={(e) => setDiscountStr(e.target.value)}
+                    placeholder={discountType === 'percent' ? 'Percent' : 'Amount'}
+                    className="w-full pl-7 pr-3 [@media(max-height:700px)]:pl-2 [@media(max-height:700px)]:pr-1 py-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+                  />
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+          {/* Details, payment and checkout never move when the item list scrolls. */}
+          <div className="relative z-[1] shadow-[0_-6px_16px_rgb(15_23_42_/_0.04)] !pb-[max(10px,env(safe-area-inset-bottom))] border-t border-slate-200 px-3.5 pt-2 space-y-2 bg-white shrink-0 [@media(max-height:700px)]:space-y-1.5 [@media(max-height:700px)]:[&>button]:py-2">
+            <div className="bg-slate-50 rounded-xl p-2.5 space-y-1 [@media(max-height:700px)]:p-2">
               <div className="flex justify-between text-xs text-slate-500">
                 <span>
                   Subtotal ({totalItems} item{totalItems !== 1 ? 's' : ''})
@@ -1617,13 +1784,15 @@ export default function NewOrder() {
                   <span className="tabular-nums">−৳{discount}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm font-bold text-slate-800 border-t border-slate-200 pt-1.5">
-                <span>Total</span>
-                <span className="tabular-nums">৳{total}</span>
+              <div className="flex justify-between text-lg font-bold text-slate-800 border-t border-slate-200 pt-1.5">
+                <span>Total payable</span>
+                <span className="tabular-nums text-emerald-700">৳{total}</span>
               </div>
             </div>
 
             <button
+              type="button"
+              aria-describedby={tableMissing ? 'pos-table-hint' : undefined}
               onClick={handleOpenCompletion}
               disabled={!canComplete || !canMutate}
               className={`w-full py-3.5 rounded-2xl font-bold text-base flex items-center justify-center gap-2 transition-all ${
@@ -1652,7 +1821,8 @@ export default function NewOrder() {
           <button
             type="button"
             onClick={() => setMobileView('cart')}
-            className="lg:hidden fixed bottom-4 left-4 right-4 z-40 flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-4 py-3.5 shadow-2xl shadow-slate-900/30 active:scale-[0.98] transition-transform"
+            data-pos-mobile-bar
+            className="xl:hidden shrink-0 flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-transform"
           >
             <span className="flex items-center gap-2.5">
               <span className="relative shrink-0">
@@ -1661,7 +1831,7 @@ export default function NewOrder() {
                   {totalItems}
                 </span>
               </span>
-              <span className="text-sm font-semibold">View Cart</span>
+              <span className="text-sm font-semibold">Review order</span>
             </span>
             <span className="text-sm font-bold tabular-nums">৳{total}</span>
           </button>

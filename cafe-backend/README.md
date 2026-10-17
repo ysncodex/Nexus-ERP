@@ -1,6 +1,6 @@
-# Cafe ERP — Backend API
+# Nexus ERP V3 — Backend API
 
-Express REST API with Prisma and PostgreSQL for the Beans & Butter cafe ERP.
+Express REST API with Prisma and PostgreSQL for the Beans & Butter Café ERP.
 
 ---
 
@@ -103,7 +103,17 @@ All routes are under `/api`.
 
 ### Catalog
 
-- Menu items, suppliers, fixed/product cost catalogs
+- Menu items, suppliers, fixed/product/consumable cost catalogs
+
+### Delivery settlements
+
+- Delivery payout statements and account posting
+
+### HR (owner only)
+
+- `GET/POST /hr/staff`, `PUT /hr/staff/:id`
+- `GET/POST /hr/shifts`, `PUT /hr/shifts/:id`
+- `GET/POST /hr/payroll`, approve, void, and payment routes
 
 Protected routes require `Authorization: Bearer <token>`.
 
@@ -121,7 +131,7 @@ cafe-backend/
 │   ├── server.ts
 │   ├── config/env.ts
 │   ├── lib/prisma.ts
-│   ├── modules/             # auth, sales, expenses, funds, reports, …
+│   ├── modules/             # auth, sales, expenses, funds, reports, hr, …
 │   └── utils/               # businessDate, query, serialize
 ├── render.yaml              # Render deploy blueprint
 ├── .env.example

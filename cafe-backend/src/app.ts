@@ -12,6 +12,7 @@ import menuRoutes from './modules/menu/menu.routes.js';
 import suppliersRoutes from './modules/suppliers/suppliers.routes.js';
 import fundsRoutes from './modules/funds/funds.routes.js';
 import deliverySettlementsRoutes from './modules/deliverySettlements/deliverySettlements.routes.js';
+import hrRoutes from './modules/hr/hr.routes.js';
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
   app.use('/api/suppliers', suppliersRoutes);
   app.use('/api/funds', fundsRoutes);
   app.use('/api/delivery-settlements', deliverySettlementsRoutes);
+  app.use('/api/hr', hrRoutes);
 
   // ── Fallbacks ──────────────────────────────────────────────────────────────
   app.use(notFound);

@@ -1,5 +1,5 @@
 import type { DailyRecord, Transaction } from '@/core/types';
-import { isPaidSale } from '@/core/types/transaction.types';
+import { isLedgerExpense, isPaidSale } from '@/core/types/transaction.types';
 import { businessDateKey } from '@/shared/utils/businessDate';
 
 type MutableDailyRecord = Omit<DailyRecord, 'totalSales' | 'dailyAvail'> & {
@@ -74,7 +74,7 @@ export function computeDailyRecords(filteredTransactions: Transaction[]): DailyR
       }
     }
 
-    if (t.type === 'expense_product' || t.type === 'expense_fixed') {
+    if (isLedgerExpense(t.type)) {
       rec.dailyCosts += val;
       if (t.method === 'cash') rec.cashCosts += val;
       if (t.method === 'bank') rec.bankCosts += val;

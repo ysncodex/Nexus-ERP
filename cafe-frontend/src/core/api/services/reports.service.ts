@@ -15,6 +15,7 @@ export interface DailyReport {
   expensesBreakdown: {
     productCosts: number;
     fixedCosts: number;
+    consumableCosts: number;
   };
 }
 
@@ -50,6 +51,7 @@ export interface ProfitLossReport {
     expenses: {
       productCosts: number;
       fixedCosts: number;
+      consumableCosts: number;
       other: number;
     };
   };

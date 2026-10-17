@@ -2,38 +2,57 @@ import { Suspense, useMemo, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Header, Sidebar, type TabId } from '@/shared/components/layout';
 import { PageLoader } from '@/shared/components/ui/Loading/Skeletons';
-import { canAccessPath, getStoredUser, ROLE_HOME_PATH } from '@/shared/utils';
+import {
+  canAccessPath,
+  canonicalDashboardSection,
+  getStoredUser,
+  ROLE_HOME_PATH,
+} from '@/shared/utils';
 
 function tabFromPathname(pathname: string): TabId {
   // Expected: /dashboard/<section>
   const parts = pathname.split('/').filter(Boolean);
-  const section = parts[1];
+  const section = canonicalDashboardSection(parts[1]);
 
   switch (section) {
-    // Overview
-    case undefined:
-    case 'overview': return 'dashboard';
-    case 'manager-overview': return 'manager_dashboard';
-    case 'reports':  return 'report';
-    case 'product-sales': return 'product_sales';
-    // Finance
-    case 'expenses':    return 'daily_expense';
-    case 'records':     return 'daily_record';
-    case 'fixed-costs': return 'fixed_cost';
-    case 'fund':        return 'fund';
-    case 'delivery-settlements': return 'delivery_settlement';
-    // Sales
-    case 'pos-sync':      return 'pos_sync';
-    case 'new-order':     return 'new_order';
-    case 'product-list':  return 'product_list';
-    case 'order-history': return 'order_history';
-    // Inventory
-    case 'product-costs': return 'product_cost';
-    case 'suppliers':     return 'suppliers';
-    // HR
-    case 'staff-roster': return 'staff_roster';
-    case 'payroll':      return 'payroll';
-    default:             return 'dashboard';
+    case 'overview':
+      return 'dashboard';
+    case 'shift':
+      return 'manager_dashboard';
+    case 'financial-report':
+      return 'report';
+    case 'product-sales':
+      return 'product_sales';
+    case 'expenses':
+      return 'daily_expense';
+    case 'daily-summary':
+      return 'daily_record';
+    case 'fixed-expenses':
+      return 'fixed_cost';
+    case 'cash-accounts':
+      return 'fund';
+    case 'delivery-payouts':
+      return 'delivery_settlement';
+    case 'sales-sync':
+      return 'pos_sync';
+    case 'new-order':
+      return 'new_order';
+    case 'products':
+      return 'product_list';
+    case 'order-history':
+      return 'order_history';
+    case 'purchases':
+      return 'product_cost';
+    case 'consumables':
+      return 'consumables';
+    case 'suppliers':
+      return 'suppliers';
+    case 'staff-schedule':
+      return 'staff_roster';
+    case 'payroll':
+      return 'payroll';
+    default:
+      return 'dashboard';
   }
 }
 
@@ -81,10 +100,7 @@ export function DashboardLayout() {
       />
 
       <main className="flex-1 min-w-0 overflow-y-auto bg-[#F8FAFC] w-full h-[100dvh] flex flex-col">
-        <Header
-          activeTab={activeTab}
-          onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-        />
+        <Header activeTab={activeTab} onMobileMenuToggle={() => setIsMobileMenuOpen(true)} />
 
         <div className="p-3 sm:p-4 md:p-5 lg:p-6 xl:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-5 lg:space-y-6 xl:space-y-8 pb-[max(5rem,env(safe-area-inset-bottom))] md:pb-20 w-full min-w-0">
           <Suspense fallback={<PageLoader />}>

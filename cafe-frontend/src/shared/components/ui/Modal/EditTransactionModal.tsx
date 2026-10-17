@@ -1,13 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Pencil, X } from 'lucide-react';
 import type { EditTransactionModalProps } from './Modal.types';
-import type {
-  Transaction,
-  UnitType,
-  PaymentMethod,
-  SalesChannel,
-  ReceiptStatus,
+import {
+  DEFAULT_CONSUMABLE_GROUPS,
+  type Transaction,
+  type UnitType,
+  type PaymentMethod,
+  type SalesChannel,
+  type ReceiptStatus,
 } from '@/core/types';
+import { useERP } from '@/core/context/useERP';
 import { TABLE_OPTIONS } from '@/modules/sales/types/menuItem.types';
 import { NO_TABLE } from '@/modules/sales/utils/orderUtils';
 
@@ -57,6 +59,14 @@ function EditTransactionModalContent({
   itemNames,
   suppliers,
 }: Omit<EditTransactionModalProps, 'isOpen'> & { transaction: Transaction }) {
+  const { consumableGroups } = useERP();
+  const consumableGroupOptions = useMemo(
+    () =>
+      consumableGroups.length
+        ? consumableGroups.map((g) => g.name)
+        : [...DEFAULT_CONSUMABLE_GROUPS],
+    [consumableGroups],
+  );
   const [editData, setEditData] = useState<SaleEditState>(() => buildInitialEditState(transaction));
 
   const update = useCallback((field: string, value: unknown) => {
@@ -424,8 +434,32 @@ function EditTransactionModalContent({
                 </>
               ) : null}
 
-              {transaction?.type === 'expense_product' ? (
+              {transaction?.type === 'expense_product' || transaction?.type === 'expense_consumable' ? (
                 <>
+                  {transaction.type === 'expense_consumable' ? (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                        Group
+                      </label>
+                      <select
+                        value={editData.category ?? consumableGroupOptions[0] ?? 'Other'}
+                        onChange={(e) => update('category', e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {/* Include the row's current category even if it's no
+                            longer in the catalog so edits never silently
+                            relabel historical rows. */}
+                        {editData.category && !consumableGroupOptions.includes(editData.category) ? (
+                          <option value={editData.category}>{editData.category}</option>
+                        ) : null}
+                        {consumableGroupOptions.map((group) => (
+                          <option key={group} value={group}>
+                            {group}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
                       Supplier
@@ -453,7 +487,20 @@ function EditTransactionModalContent({
                         min="0"
                         step="0.01"
                         value={editData.quantity ?? ''}
-                        onChange={(e) => update('quantity', Number(e.target.value))}
+                        onChange={(e) => {
+                          const quantity = Number(e.target.value);
+                          if (transaction.type !== 'expense_consumable') {
+                            update('quantity', quantity);
+                            return;
+                          }
+                          const unitPrice = Number(editData.unitPrice ?? 0);
+                          const amount = Math.round(quantity * unitPrice * 100) / 100;
+                          setEditData((prev) => ({
+                            ...prev,
+                            quantity,
+                            amount: amount > 0 ? amount : prev.amount,
+                          }));
+                        }}
                         className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
@@ -476,6 +523,30 @@ function EditTransactionModalContent({
                       </select>
                     </div>
                   </div>
+                  {transaction.type === 'expense_consumable' ? (
+                    <div>
+                      <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                        Unit price (৳)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editData.unitPrice ?? ''}
+                        onChange={(e) => {
+                          const unitPrice = Number(e.target.value);
+                          const quantity = Number(editData.quantity ?? 0);
+                          const amount = Math.round(quantity * unitPrice * 100) / 100;
+                          setEditData((prev) => ({
+                            ...prev,
+                            unitPrice,
+                            amount: amount > 0 ? amount : prev.amount,
+                          }));
+                        }}
+                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </div>

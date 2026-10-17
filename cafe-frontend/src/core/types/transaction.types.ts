@@ -7,7 +7,40 @@ export type TransactionType =
   | 'sale'
   | 'sale_adjustment'
   | 'expense_product'
-  | 'expense_fixed';
+  | 'expense_fixed'
+  | 'expense_consumable';
+
+/**
+ * Default costing buckets for Consumables & Packaging. The live set comes
+ * from the `ConsumableGroup` catalog (owner/manager can add new buckets like
+ * "Takeaway containers"); this constant is only used as a seed/fallback when
+ * the catalog has not loaded yet.
+ */
+export const DEFAULT_CONSUMABLE_GROUPS = [
+  'Cups',
+  'Lids',
+  'Bags',
+  'Boxes',
+  'Napkins',
+  'Straws',
+  'Other',
+] as const;
+/** @deprecated Use DEFAULT_CONSUMABLE_GROUPS or the dynamic `consumableGroups` from ERP context. */
+export const CONSUMABLE_GROUPS = DEFAULT_CONSUMABLE_GROUPS;
+export type ConsumableGroup = string;
+
+export function isDefaultConsumableGroup(value: string): boolean {
+  return (DEFAULT_CONSUMABLE_GROUPS as readonly string[]).includes(value);
+}
+/** @deprecated Use isDefaultConsumableGroup or compare against the dynamic catalog. */
+export function isConsumableGroup(value: string): value is ConsumableGroup {
+  return isDefaultConsumableGroup(value);
+}
+
+/** Ledger rows that reduce cash: purchases, fixed expenses, and consumables. */
+export function isLedgerExpense(type: string): boolean {
+  return type === 'expense_product' || type === 'expense_fixed' || type === 'expense_consumable';
+}
 export type PaymentMethod = 'cash' | 'bank' | 'bkash';
 export type SalesChannel = 'in_store' | 'foodpanda' | 'foodi';
 export type UnitType = 'kg' | 'g' | 'L' | 'ml' | 'pcs' | 'box' | 'pack';
@@ -86,10 +119,7 @@ export const LEGACY_FUND_TRANSACTION_TYPES = [
 ] as const;
 
 export function isActiveTransactionType(type: string): type is TransactionType {
-  return type === 'sale'
-    || type === 'sale_adjustment'
-    || type === 'expense_product'
-    || type === 'expense_fixed';
+  return type === 'sale' || type === 'sale_adjustment' || isLedgerExpense(type);
 }
 
 /** Sale counted in revenue / cash balances (excludes pending & voided). */

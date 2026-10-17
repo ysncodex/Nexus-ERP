@@ -1,6 +1,6 @@
 import type { ERPStats, Transaction } from '@/core/types';
 import type { FundMovement } from '@/core/types/fund.types';
-import { isPaidSale } from '@/core/types/transaction.types';
+import { isLedgerExpense, isPaidSale } from '@/core/types/transaction.types';
 import {
   calculateDailyAvailableCash,
   calculatePaymentMethodBalances,
@@ -34,10 +34,12 @@ export function computeStats(
   let totalExpenses = 0;
   let totalProductCost = 0;
   let totalFixedCost = 0;
+  let totalConsumableCost = 0;
 
   const expenseCategories: Record<string, number> = {};
   const productUsage: Record<string, { qty: number; unit: string; cost: number; count: number }> = {};
   const fixedCostAgg: Record<string, number> = {};
+  const consumableAgg: Record<string, number> = {};
 
   const paymentMethods = calculatePaymentMethodBalances(
     transactions,
@@ -63,7 +65,7 @@ export function computeStats(
     const val = Number(t.amount);
     if (isPaidSale(t)) netCashInRange += val;
     else if (t.type === 'sale_adjustment') netCashInRange -= val;
-    else if (t.type === 'expense_product' || t.type === 'expense_fixed') netCashInRange -= val;
+    else if (isLedgerExpense(t.type)) netCashInRange -= val;
   });
 
   const totalLiquidity = authoritativeBalances
@@ -84,7 +86,7 @@ export function computeStats(
       if (t.channel === 'foodi') foodiSales -= val;
     }
 
-    if (t.type === 'expense_product' || t.type === 'expense_fixed') {
+    if (isLedgerExpense(t.type)) {
       totalExpenses += val;
       if (t.type === 'expense_product') {
         totalProductCost += val;
@@ -102,8 +104,15 @@ export function computeStats(
         const key = t.category || t.description || 'Misc';
         fixedCostAgg[key] = (fixedCostAgg[key] || 0) + val;
       }
+      if (t.type === 'expense_consumable') {
+        totalConsumableCost += val;
+        const key = t.category || 'Other';
+        consumableAgg[key] = (consumableAgg[key] || 0) + val;
+      }
 
-      const cat = t.category || (t.type === 'expense_product' ? 'Product' : 'Fixed');
+      const cat =
+        t.category ||
+        (t.type === 'expense_product' ? 'Product' : t.type === 'expense_consumable' ? 'Consumables' : 'Fixed');
       expenseCategories[cat] = (expenseCategories[cat] || 0) + val;
     }
   });
@@ -127,6 +136,10 @@ export function computeStats(
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 5);
 
+  const topConsumables = Object.entries(consumableAgg)
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
   return {
     totalSales,
     foodpandaSales,
@@ -149,6 +162,7 @@ export function computeStats(
     totalExpenses,
     totalProductCost,
     totalFixedCost,
+    totalConsumableCost,
     dailyAvailableCash,
     netCashInRange,
     profit: totalSales - totalExpenses,
@@ -158,6 +172,7 @@ export function computeStats(
     recentSales,
     topProducts,
     topFixed,
+    topConsumables,
     paymentMethods,
   };
 }

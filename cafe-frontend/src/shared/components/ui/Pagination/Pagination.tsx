@@ -75,7 +75,7 @@ export const Pagination = ({
     >
       {/* ── Page Info ── */}
       {showPageInfo && (
-        <div className="text-sm text-slate-500 font-medium whitespace-nowrap text-center md:text-left order-2 md:order-1 w-full md:w-auto">
+        <div className="text-sm text-erp-secondary font-medium whitespace-nowrap text-center md:text-left order-2 md:order-1 w-full md:w-auto">
           Showing{' '}
           <span className="font-bold text-slate-800">{totalItems > 0 ? startIndex + 1 : 0}</span> to{' '}
           <span className="font-bold text-slate-800">{endIndex}</span> of{' '}
@@ -90,7 +90,7 @@ export const Pagination = ({
           <div className="flex items-center gap-2.5 shrink-0">
             <label
               htmlFor="pageSize"
-              className="text-sm font-medium text-slate-500 whitespace-nowrap"
+              className="text-sm font-medium text-erp-secondary whitespace-nowrap"
             >
               Rows per page:
             </label>
@@ -131,7 +131,7 @@ export const Pagination = ({
           <button
             onClick={goToFirstPage}
             disabled={!canGoPrevious}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
             aria-label="First page"
           >
             <ChevronsLeft size={18} />
@@ -141,7 +141,7 @@ export const Pagination = ({
           <button
             onClick={goToPreviousPage}
             disabled={!canGoPrevious}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
             aria-label="Previous page"
           >
             <ChevronLeft size={18} />
@@ -154,7 +154,7 @@ export const Pagination = ({
                 return (
                   <span
                     key={`ellipsis-${idx}`}
-                    className="flex items-center justify-center w-9 h-9 text-slate-400 tracking-widest"
+                    className="flex items-center justify-center w-9 h-9 text-erp-muted tracking-widest"
                   >
                     ...
                   </span>
@@ -181,14 +181,14 @@ export const Pagination = ({
 
           {/* Current Page (Mobile Pill) */}
           <div className="sm:hidden flex items-center justify-center px-4 py-1.5 mx-1 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 shadow-sm whitespace-nowrap">
-            {currentPage} <span className="text-slate-400 font-medium mx-1.5">/</span> {totalPages}
+            {currentPage} <span className="text-erp-muted font-medium mx-1.5">/</span> {totalPages}
           </div>
 
           {/* Next Page */}
           <button
             onClick={goToNextPage}
             disabled={!canGoNext}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
             aria-label="Next page"
           >
             <ChevronRight size={18} />
@@ -198,7 +198,7 @@ export const Pagination = ({
           <button
             onClick={goToLastPage}
             disabled={!canGoNext}
-            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
+            className="flex items-center justify-center w-9 h-9 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-white hover:shadow-sm disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:shadow-none transition-all"
             aria-label="Last page"
           >
             <ChevronsRight size={18} />

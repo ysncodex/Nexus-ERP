@@ -10,6 +10,8 @@ import {
   ToggleRight,
   ListFilter,
   Package,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCanMutate } from '@/shared/hooks';
@@ -23,9 +25,7 @@ import {
   type MenuCategory,
   type ItemListFilter,
 } from '../types/menuItem.types';
-
 // ─── Category dot component ──────────────────────────────────────────────────
-
 function CategoryDot({ category }: { category: MenuCategory }) {
   const style = CATEGORY_STYLES[category];
   return (
@@ -37,15 +37,12 @@ function CategoryDot({ category }: { category: MenuCategory }) {
     </span>
   );
 }
-
 // ─── Add / Edit Modal ────────────────────────────────────────────────────────
-
 interface ItemFormModalProps {
   item?: MenuItem;
   onSave: (data: Omit<MenuItem, 'id'>) => void;
   onClose: () => void;
 }
-
 function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
   const [name, setName] = useState(item?.name ?? '');
   const [category, setCategory] = useState<MenuCategory>(item?.category ?? 'Coffee');
@@ -53,7 +50,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
   const [available, setAvailable] = useState(item?.available ?? true);
   const [description, setDescription] = useState(item?.description ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
-
   const validate = () => {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = 'Item name is required';
@@ -62,7 +58,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
     setErrors(e);
     return Object.keys(e).length === 0;
   };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
@@ -74,7 +69,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
       description: description.trim() || undefined,
     });
   };
-
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
@@ -90,7 +84,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
             <X size={18} className="text-slate-500" />
           </button>
         </div>
-
         {/* Form */}
         <form
           onSubmit={handleSubmit}
@@ -111,7 +104,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
-
           {/* Category */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
@@ -127,7 +119,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               ))}
             </select>
           </div>
-
           {/* Price */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Price (৳)</label>
@@ -145,7 +136,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
             />
             {errors.price && <p className="text-xs text-red-500 mt-1">{errors.price}</p>}
           </div>
-
           {/* Description */}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">
@@ -159,7 +149,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all resize-none"
             />
           </div>
-
           {/* Availability */}
           <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
             <span className="text-sm font-semibold text-slate-700">Available for Order</span>
@@ -180,7 +169,6 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
               </span>
             </button>
           </div>
-
           {/* Actions */}
           <div className="flex gap-3 pt-1">
             <button
@@ -203,9 +191,7 @@ function ItemFormModal({ item, onSave, onClose }: ItemFormModalProps) {
     </div>
   );
 }
-
 // ─── Product Card ────────────────────────────────────────────────────────────
-
 interface ProductCardProps {
   item: MenuItem;
   onEdit: (item: MenuItem) => void;
@@ -213,81 +199,162 @@ interface ProductCardProps {
   onToggle: (item: MenuItem) => void;
   readOnly?: boolean;
 }
-
-const ProductCard = memo(function ProductCard({
-  item,
-  onEdit,
-  onDelete,
-  onToggle,
-  readOnly = false,
-}: ProductCardProps) {
+function AvailabilityBadge({ available }: { available: boolean }) {
   return (
-    <div
-      className={`bg-white rounded-2xl border transition-all duration-200 group relative overflow-hidden ${
-        item.available
-          ? 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-          : 'border-slate-100 opacity-60'
-      }`}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-semibold ${available ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}
     >
-      {!item.available && (
-        <div className="absolute top-2 right-2 z-10">
-          <span className="text-[9px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-            Unavailable
-          </span>
+      <span
+        aria-hidden="true"
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${available ? 'bg-emerald-500' : 'bg-rose-500'}`}
+      />
+      {available ? 'Available' : 'Unavailable'}
+    </span>
+  );
+}
+
+function ProductActions({ item, onEdit, onDelete, onToggle, readOnly = false }: ProductCardProps) {
+  if (readOnly) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onEdit(item)}
+        aria-label={`Edit ${item.name}`}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+      >
+        <Pencil size={13} /> Edit
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggle(item)}
+        aria-label={`${item.available ? 'Mark unavailable' : 'Mark available'}: ${item.name}`}
+        title={item.available ? 'Mark unavailable' : 'Mark available'}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-amber-50 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+      >
+        {item.available ? <ToggleRight size={19} /> : <ToggleLeft size={19} />}
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(item)}
+        aria-label={`Delete ${item.name}`}
+        title="Delete item"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+const ProductCard = memo(function ProductCard(props: ProductCardProps) {
+  const { item, readOnly } = props;
+  return (
+    <article className="flex min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3.5">
+      <CategoryDot category={item.category} />
+      <h3 className="mt-2 break-words text-sm font-semibold leading-snug text-slate-800">
+        {item.name}
+      </h3>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3">
+        <span className="text-base font-bold tabular-nums text-slate-900">
+          ৳{item.price.toLocaleString('en-BD')}
+        </span>
+        <AvailabilityBadge available={item.available} />
+      </div>
+      {!readOnly && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <ProductActions {...props} />
         </div>
       )}
-
-      <div className="p-3 sm:p-3.5">
-        <div className="mb-2">
-          <CategoryDot category={item.category} />
-        </div>
-
-        <h3 className="text-[13px] sm:text-sm font-bold text-slate-800 leading-snug mb-2.5 sm:mb-3 min-h-[2.25rem] sm:min-h-[2.5rem]">
-          {item.name}
-        </h3>
-
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-sm sm:text-base font-bold text-slate-800 shrink-0">
-            ৳{item.price}
-          </span>
-
-          {!readOnly && (
-            <div className="flex items-center gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
-              <button
-                onClick={() => onToggle(item)}
-                title={item.available ? 'Mark unavailable' : 'Mark available'}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  item.available
-                    ? 'hover:bg-amber-50 text-amber-500 hover:text-amber-600'
-                    : 'hover:bg-emerald-50 text-slate-400 hover:text-emerald-600'
-                }`}
-              >
-                {item.available ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-              </button>
-              <button
-                onClick={() => onEdit(item)}
-                title="Edit item"
-                className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors"
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                onClick={() => onDelete(item)}
-                title="Delete item"
-                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    </article>
   );
 });
 
-// ─── Delete Confirm Modal ────────────────────────────────────────────────────
+interface ProductTableProps {
+  items: MenuItem[];
+  onEdit: ProductCardProps['onEdit'];
+  onDelete: ProductCardProps['onDelete'];
+  onToggle: ProductCardProps['onToggle'];
+  readOnly: boolean;
+}
 
+function ProductTable({ items, onEdit, onDelete, onToggle, readOnly }: ProductTableProps) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full table-fixed text-left text-sm">
+        <caption className="sr-only">
+          Products with prices, availability, and permitted actions
+        </caption>
+        <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr>
+            <th scope="col" className="px-3 py-3 sm:px-4">
+              Product
+            </th>
+            <th scope="col" className="hidden w-[18%] px-3 py-3 md:table-cell">
+              Category
+            </th>
+            <th scope="col" className="w-20 px-2 py-3 text-right sm:w-28 sm:px-4">
+              Price
+            </th>
+            <th scope="col" className="w-28 px-2 py-3 sm:w-32 sm:px-4">
+              Availability
+            </th>
+            {!readOnly && (
+              <th scope="col" className="hidden w-44 px-4 py-3 xl:table-cell">
+                Actions
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {items.map((item) => (
+            <tr key={item.id} className="align-top transition-colors hover:bg-slate-50/70">
+              <th scope="row" className="px-3 py-3 font-normal sm:px-4">
+                <span className="block break-words font-semibold leading-snug text-slate-800">
+                  {item.name}
+                </span>
+                <div className="mt-1.5 md:hidden">
+                  <CategoryDot category={item.category} />
+                </div>
+                {!readOnly && (
+                  <div className="mt-2 xl:hidden">
+                    <ProductActions
+                      item={item}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onToggle={onToggle}
+                    />
+                  </div>
+                )}
+              </th>
+              <td className="hidden px-3 py-3 md:table-cell">
+                <CategoryDot category={item.category} />
+              </td>
+              <td className="break-words px-2 py-3 text-right font-semibold tabular-nums text-slate-800 sm:px-4">
+                ৳{item.price.toLocaleString('en-BD')}
+              </td>
+              <td className="px-2 py-3 sm:px-4">
+                <AvailabilityBadge available={item.available} />
+              </td>
+              {!readOnly && (
+                <td className="hidden px-4 py-3 xl:table-cell">
+                  <ProductActions
+                    item={item}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onToggle={onToggle}
+                  />
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Delete Confirm Modal ────────────────────────────────────────────────────
 function DeleteConfirmModal({
   item,
   onConfirm,
@@ -325,19 +392,17 @@ function DeleteConfirmModal({
     </div>
   );
 }
-
 // ─── Main Page ───────────────────────────────────────────────────────────────
-
 export default function ItemList() {
   const canMutate = useCanMutate();
   const [catalog, setCatalog] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<ItemListFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null);
-
   const refreshCatalog = useCallback(async () => {
     try {
       const items = await menuService.getAll();
@@ -348,12 +413,10 @@ export default function ItemList() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     clearLegacyPosStorage();
     void refreshCatalog();
   }, [refreshCatalog]);
-
   // ── Filtered items ──
   const filtered = useMemo(() => {
     let items = catalog;
@@ -370,7 +433,6 @@ export default function ItemList() {
     }
     return items;
   }, [catalog, selectedCategory, searchQuery]);
-
   // ── Category counts ──
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -382,11 +444,9 @@ export default function ItemList() {
     });
     return counts;
   }, [catalog]);
-
   const availableCount = catalog.filter((i) => i.available).length;
   const unavailableCount = catalog.length - availableCount;
   const totalCategories = new Set(catalog.map((i) => i.category)).size;
-
   // ── Handlers ──
   const handleAdd = useCallback(
     async (data: Omit<MenuItem, 'id'>) => {
@@ -401,7 +461,6 @@ export default function ItemList() {
     },
     [refreshCatalog]
   );
-
   const handleEdit = useCallback(
     async (data: Omit<MenuItem, 'id'>) => {
       if (!editingItem) return;
@@ -416,7 +475,6 @@ export default function ItemList() {
     },
     [editingItem, refreshCatalog]
   );
-
   const handleDelete = useCallback(async () => {
     if (!deletingItem) return;
     try {
@@ -428,7 +486,6 @@ export default function ItemList() {
       toast.error('Failed to delete item');
     }
   }, [deletingItem, refreshCatalog]);
-
   const handleToggle = useCallback(
     async (item: MenuItem) => {
       // FIX: Optimistic UI updates. We flip the boolean immediately locally,
@@ -436,7 +493,6 @@ export default function ItemList() {
       setCatalog((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, available: !i.available } : i))
       );
-
       try {
         await menuService.toggleAvailability(item.id);
         toast.success(`"${item.name}" marked as ${item.available ? 'unavailable' : 'available'}`);
@@ -450,13 +506,11 @@ export default function ItemList() {
     },
     [refreshCatalog]
   );
-
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="min-w-0 space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Products List</h1>
-          <p className="text-[11px] sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-sm text-erp-secondary">
             {loading ? (
               'Loading menu from server…'
             ) : (
@@ -484,31 +538,53 @@ export default function ItemList() {
           </button>
         )}
       </div>
-
-      <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search products by name..."
-          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white shadow-sm text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
-        />
-        {searchQuery && (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full min-w-0 sm:w-auto sm:flex-1 sm:max-w-md">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search products by name or category"
+            placeholder="Search name or category…"
+            className="w-full pl-11 pr-11 py-2.5 rounded-xl border border-slate-200 bg-white shadow-sm text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        <div
+          role="group"
+          aria-label="Product view"
+          className="flex shrink-0 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 sm:ml-auto"
+        >
           <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            type="button"
+            aria-pressed={viewMode === 'table'}
+            onClick={() => setViewMode('table')}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
           >
-            <X size={15} />
+            <List size={15} /> Table
           </button>
-        )}
+          <button
+            type="button"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            <LayoutGrid size={15} /> Grid
+          </button>
+        </div>
       </div>
-
-      <div
-        className="flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0 [&::-webkit-scrollbar]:hidden"
-        style={{ scrollbarWidth: 'none' }}
-      >
+      <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setSelectedCategory('All')}
+          aria-pressed={selectedCategory === 'All'}
           className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
             selectedCategory === 'All'
               ? 'bg-amber-400 text-white shadow-sm'
@@ -518,7 +594,6 @@ export default function ItemList() {
           All
           <span className="ml-1.5 text-xs opacity-70">({categoryCounts['All']})</span>
         </button>
-
         {ALL_CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat;
           const style = CATEGORY_STYLES[cat];
@@ -526,6 +601,7 @@ export default function ItemList() {
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
+              aria-pressed={selectedCategory === cat}
               className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
                 isActive
                   ? `${style.badge} border border-current/20 shadow-sm`
@@ -539,9 +615,9 @@ export default function ItemList() {
             </button>
           );
         })}
-
         <button
           onClick={() => setSelectedCategory('Unavailable')}
+          aria-pressed={selectedCategory === 'Unavailable'}
           className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
             selectedCategory === 'Unavailable'
               ? `${UNAVAILABLE_FILTER_STYLE.badge} shadow-sm`
@@ -554,7 +630,6 @@ export default function ItemList() {
           )}
         </button>
       </div>
-
       {(searchQuery || selectedCategory !== 'All') && (
         <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 flex-wrap">
           <ListFilter size={14} className="shrink-0" />
@@ -575,20 +650,36 @@ export default function ItemList() {
           </button>
         </div>
       )}
-
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3">
-          {filtered.map((item) => (
-            <ProductCard
-              key={item.id}
-              item={item}
-              onEdit={setEditingItem}
-              onDelete={setDeletingItem}
-              onToggle={handleToggle}
-              readOnly={!canMutate}
-            />
-          ))}
+      {loading ? (
+        <div
+          role="status"
+          className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500"
+        >
+          Loading products…
         </div>
+      ) : filtered.length > 0 ? (
+        viewMode === 'table' ? (
+          <ProductTable
+            items={filtered}
+            onEdit={setEditingItem}
+            onDelete={setDeletingItem}
+            onToggle={handleToggle}
+            readOnly={!canMutate}
+          />
+        ) : (
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {filtered.map((item) => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                onEdit={setEditingItem}
+                onDelete={setDeletingItem}
+                onToggle={handleToggle}
+                readOnly={!canMutate}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4">
           <Package size={44} className="text-slate-300 mb-4" />
@@ -614,7 +705,6 @@ export default function ItemList() {
           )}
         </div>
       )}
-
       {showAddModal && <ItemFormModal onSave={handleAdd} onClose={() => setShowAddModal(false)} />}
       {editingItem && (
         <ItemFormModal

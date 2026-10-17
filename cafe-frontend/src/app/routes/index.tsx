@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { LEGACY_DASHBOARD_SECTIONS } from '@/shared/utils';
 import { DashboardLayout } from '@/app/layouts/DashboardLayout';
 import { ProtectedProviders } from '@/app/providers/AppProviders';
 import { ErrorBoundary } from '@/shared/components/ErrorBoundary';
@@ -18,6 +19,7 @@ const ManagerDashboard = lazy(() => import('@/modules/dashboard/pages/ManagerDas
 const DailyExpense   = lazy(() => import('@/modules/finance/pages/DailyExpense'));
 const DailyRecord    = lazy(() => import('@/modules/finance/pages/DailyRecord'));
 const FixedCosts     = lazy(() => import('@/modules/finance/pages/FixedCosts'));
+const Consumables    = lazy(() => import('@/modules/finance/pages/Consumables'));
 const FundManagement = lazy(() => import('@/modules/finance/pages/FundManagement'));
 const DeliverySettlements = lazy(() => import('@/modules/finance/pages/DeliverySettlements'));
 
@@ -38,6 +40,16 @@ const Payroll     = lazy(() => import('@/modules/hr/pages/Payroll'));
 // ── Reports ───────────────────────────────────────────────────────────────────
 const Reports = lazy(() => import('@/modules/reports/pages/Reports'));
 const ProductSalesAnalysis = lazy(() => import('@/modules/reports/pages/ProductSalesAnalysis'));
+
+function LegacySectionRedirect({ section }: { section: string }) {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: `/dashboard/${section}`, search: location.search, hash: location.hash }}
+      replace
+    />
+  );
+}
 
 export function AppRoutes() {
   return (
@@ -60,32 +72,32 @@ export function AppRoutes() {
         >
           {/* Dashboard */}
           <Route path="overview" element={<Dashboard />} />
-          <Route path="manager-overview" element={<ManagerDashboard />} />
+          <Route path="shift" element={<ManagerDashboard />} />
 
-          {/* Finance */}
-          <Route path="expenses"      element={<DailyExpense />} />
-          <Route path="records"       element={<DailyRecord />} />
-          <Route path="fixed-costs"   element={<FixedCosts />} />
-          <Route path="fund"          element={<FundManagement />} />
-          <Route path="delivery-settlements" element={<DeliverySettlements />} />
+          <Route path="expenses" element={<DailyExpense />} />
+          <Route path="daily-summary" element={<DailyRecord />} />
+          <Route path="fixed-expenses" element={<FixedCosts />} />
+          <Route path="consumables" element={<Consumables />} />
+          <Route path="cash-accounts" element={<FundManagement />} />
+          <Route path="delivery-payouts" element={<DeliverySettlements />} />
 
-          {/* Sales */}
-          <Route path="new-order"      element={<NewOrder />} />
-          <Route path="product-list"   element={<ItemList />} />
-          <Route path="order-history"  element={<OrderHistory />} />
-          <Route path="pos-sync"       element={<PosSync />} />
+          <Route path="new-order" element={<NewOrder />} />
+          <Route path="products" element={<ItemList />} />
+          <Route path="order-history" element={<OrderHistory />} />
+          <Route path="sales-sync" element={<PosSync />} />
 
-          {/* Inventory */}
-          <Route path="product-costs" element={<ProductCosts />} />
-          <Route path="suppliers"     element={<Suppliers />} />
+          <Route path="purchases" element={<ProductCosts />} />
+          <Route path="suppliers" element={<Suppliers />} />
 
-          {/* HR */}
-          <Route path="staff-roster" element={<StaffRoster />} />
-          <Route path="payroll"      element={<Payroll />} />
+          <Route path="staff-schedule" element={<StaffRoster />} />
+          <Route path="payroll" element={<Payroll />} />
 
-          {/* Reports */}
-          <Route path="reports" element={<Reports />} />
+          <Route path="financial-report" element={<Reports />} />
           <Route path="product-sales" element={<ProductSalesAnalysis />} />
+
+          {Object.entries(LEGACY_DASHBOARD_SECTIONS).map(([from, to]) => (
+            <Route key={from} path={from} element={<LegacySectionRedirect section={to} />} />
+          ))}
         </Route>
 
         {/* Fallback */}

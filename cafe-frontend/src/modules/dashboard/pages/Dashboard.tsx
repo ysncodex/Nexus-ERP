@@ -1,12 +1,9 @@
 /**
  * Dashboard — main overview page.
  *
- * Layout (desktop):
- *   TOP    → Two equal columns (Today's live overview | Selected-period sales)
- *   BOTTOM → Horizontal Live Account Balances with Inline Expandable Breakdowns
+ * Compact daily and monthly metrics with optional breakdowns and live balances.
  */
-
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useId, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -27,7 +24,6 @@ import {
   Wallet,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
   AlertTriangle,
   AlertCircle,
   Target,
@@ -37,18 +33,15 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
-
 import { useERP } from '@/core/context/useERP';
 import { useERPActions } from '@/core/context/useERPActions';
 import { ButtonLoading } from '@/shared/components/ui';
 import { saleSchema, type SaleFormData, handleError } from '@/shared/utils';
 import { businessDateKey, todayBusinessKey } from '@/shared/utils/businessDate';
 import { useCanMutate } from '@/shared/hooks';
-import type { Transaction } from '@/core/types';
+import { isLedgerExpense, type Transaction } from '@/core/types';
 import type { FundMovement } from '@/core/types/fund.types';
-
 // ─── Static config ────────────────────────────────────────────────────────────
-
 const PAYMENT_METHODS = [
   {
     key: 'cash' as const,
@@ -75,7 +68,6 @@ const PAYMENT_METHODS = [
     bar: 'bg-blue-400',
   },
 ] as const;
-
 const SALES_CHANNELS = [
   {
     key: 'in_store' as const,
@@ -105,27 +97,21 @@ const SALES_CHANNELS = [
     bar: 'bg-violet-400',
   },
 ] as const;
-
 // ─── Utility functions ────────────────────────────────────────────────────────
-
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-
 function formatTime(date: Date) {
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
-
 function formatDate(date: Date) {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
-
 interface SelectedMonth {
   year: number;
   month: number;
 }
-
 function MonthNavigator({
   label,
   onPrev,
@@ -138,31 +124,31 @@ function MonthNavigator({
   disableNext: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1 bg-white/10 border border-white/20 rounded-xl px-2 py-1.5 shadow-sm backdrop-blur-sm">
+    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
       <button
         type="button"
+        aria-label="Previous month"
         onClick={onPrev}
-        className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+        className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
       >
         <ChevronLeft size={15} />
       </button>
-      <span className="text-sm font-bold text-white min-w-[130px] text-center select-none px-1">
+      <span className="text-xs font-semibold text-slate-800 min-w-[110px] text-center select-none px-1">
         {label}
       </span>
       <button
         type="button"
+        aria-label="Next month"
         onClick={onNext}
         disabled={disableNext}
-        className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
       >
         <ChevronRight size={15} />
       </button>
     </div>
   );
 }
-
 // ─── Small reusable components ────────────────────────────────────────────────
-
 function LiveClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -175,7 +161,6 @@ function LiveClock() {
     </span>
   );
 }
-
 function Divider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -186,7 +171,6 @@ function Divider({ label }: { label: string }) {
     </div>
   );
 }
-
 interface StatRowProps {
   icon: LucideIcon;
   iconBg: string;
@@ -196,7 +180,6 @@ interface StatRowProps {
   pct: number;
   barColor: string;
 }
-
 function StatRow({ icon: Icon, iconBg, iconColor, label, value, pct, barColor }: StatRowProps) {
   return (
     <div className="space-y-1.5">
@@ -223,7 +206,6 @@ function StatRow({ icon: Icon, iconBg, iconColor, label, value, pct, barColor }:
     </div>
   );
 }
-
 function StackedBar({ segments }: { segments: { color: string; pct: number }[] }) {
   return (
     <div className="flex h-2 rounded-full overflow-hidden gap-px mt-3">
@@ -237,7 +219,6 @@ function StackedBar({ segments }: { segments: { color: string; pct: number }[] }
     </div>
   );
 }
-
 type InsightType = 'success' | 'warning' | 'danger' | 'info';
 interface InsightItem {
   type: InsightType;
@@ -245,7 +226,6 @@ interface InsightItem {
   desc: string;
   icon: LucideIcon;
 }
-
 const INSIGHT_STYLES = {
   success: {
     bg: 'bg-emerald-50',
@@ -276,7 +256,6 @@ const INSIGHT_STYLES = {
     desc: 'text-sky-700',
   },
 };
-
 function InsightCard({ insight }: { insight: InsightItem }) {
   const style = INSIGHT_STYLES[insight.type];
   return (
@@ -289,9 +268,33 @@ function InsightCard({ insight }: { insight: InsightItem }) {
     </div>
   );
 }
+function BreakdownPanel({ title, children }: { title: string; children: ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const panelId = useId();
+  return (
+    <section className="min-w-0 rounded-xl border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          aria-label={`${isOpen ? 'Hide' : 'View'} breakdown: ${title}`}
+          onClick={() => setIsOpen((value) => !value)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          {isOpen ? 'Hide breakdown' : 'View breakdown'}
+          <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      <div id={panelId} hidden={!isOpen} className="border-t border-slate-100 p-4">
+        {children}
+      </div>
+    </section>
+  );
+}
 
 // ─── Interactive Expandable Components ────────────────────────────────────────
-
 function ExpandableRevenueCard({
   revenue,
   orderCount,
@@ -308,47 +311,36 @@ function ExpandableRevenueCard({
   total: number;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-
   const cashPct = total > 0 ? Math.round((cash / total) * 100) : 0;
   const bkashPct = total > 0 ? Math.round((bkash / total) * 100) : 0;
   const bankPct = total > 0 ? Math.round((bank / total) * 100) : 0;
-
+  const panelId = useId();
   return (
-    <div
-      className={`bg-white rounded-[1.25rem] border transition-all duration-300 ${isExpanded ? 'border-emerald-200 shadow-md ring-1 ring-emerald-50' : 'border-slate-200 shadow-sm hover:border-slate-300'}`}
-    >
-      <div
-        className="p-4 sm:p-5 flex items-start justify-between cursor-pointer select-none"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-[52px] h-[52px] bg-emerald-500 rounded-[14px] flex items-center justify-center text-white shrink-0 shadow-sm">
-            <TrendingUp size={26} strokeWidth={2.5} />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 tracking-wider uppercase mb-0.5">
-              Total Revenue
-            </p>
-            <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-[28px] font-black text-slate-800 leading-none">
-                {revenue.toLocaleString()}
-              </span>
-              <span className="text-xl font-bold text-slate-800 leading-none">৳</span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              {isExpanded
-                ? 'Tap to hide payment breakdown'
-                : `${orderCount} Completed orders · tap for breakdown`}
-            </p>
-          </div>
-        </div>
-        <div className="text-slate-400 p-1">
-          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+    <div className="min-w-0 rounded-xl border border-emerald-100 bg-white">
+      <div className="p-4">
+        <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <TrendingUp size={15} className="text-emerald-600" /> Today's revenue
+        </p>
+        <p className="mt-2 break-words text-2xl font-bold tabular-nums text-slate-900">
+          ৳{revenue.toLocaleString()}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-slate-500">{orderCount} orders</span>
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={panelId}
+            aria-label={`${isExpanded ? 'Hide' : 'View'} breakdown: today's revenue`}
+            onClick={() => setIsExpanded((value) => !value)}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          >
+            {isExpanded ? 'Hide breakdown' : 'View breakdown'}
+            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
       </div>
-
       {isExpanded && (
-        <div className="px-5 pb-5 animate-in slide-in-from-top-2 fade-in duration-200">
+        <div id={panelId} className="px-4 pb-4">
           <div className="border-t border-slate-100 pt-4">
             <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-3.5">
               By Payment Method
@@ -365,7 +357,6 @@ function ExpandableRevenueCard({
                   </span>
                 </div>
               </div>
-
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 text-[13px] font-medium text-slate-700">
                   <div className="w-2.5 h-2.5 rounded-full bg-pink-500" /> bKash
@@ -377,7 +368,6 @@ function ExpandableRevenueCard({
                   </span>
                 </div>
               </div>
-
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 text-[13px] font-medium text-slate-700">
                   <div className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Card / Bank
@@ -396,7 +386,6 @@ function ExpandableRevenueCard({
     </div>
   );
 }
-
 interface ExpandableAccountCardProps {
   accountKey: 'cash' | 'bkash' | 'bank' | 'reserve' | 'total';
   title: string;
@@ -418,7 +407,6 @@ interface ExpandableAccountCardProps {
     balanceText: string;
   };
 }
-
 function ExpandableAccountCard({
   accountKey,
   title,
@@ -432,7 +420,7 @@ function ExpandableAccountCard({
   isDark = false,
 }: ExpandableAccountCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-
+  const panelId = useId();
   const breakdown = useMemo(() => {
     let opening = 0,
       monthSales = 0,
@@ -440,32 +428,28 @@ function ExpandableAccountCard({
       monthFundsIn = 0,
       monthFundsOut = 0;
     const accounts = accountKey === 'total' ? ['cash', 'bkash', 'bank', 'reserve'] : [accountKey];
-
     transactions.forEach((t: Transaction) => {
       if (!t.date || !t.method || !accounts.includes(t.method)) return;
       const isBeforeMonth = t.date < monthStart;
       const isThisMonth = t.date >= monthStart && t.date <= monthEnd;
       const amt = Number(t.amount);
-
       if (t.type === 'sale') {
         if (isBeforeMonth) opening += amt;
         if (isThisMonth) monthSales += amt;
       } else if (t.type === 'sale_adjustment') {
         if (isBeforeMonth) opening -= amt;
         if (isThisMonth) monthSales -= amt;
-      } else if (t.type === 'expense_product' || t.type === 'expense_fixed') {
+      } else if (isLedgerExpense(t.type)) {
         if (isBeforeMonth) opening -= amt;
         if (isThisMonth) monthExpenses += amt;
       }
     });
-
     fundMovements.forEach((m: FundMovement) => {
       const date = new Date(m.date);
       const isBeforeMonth = date < monthStart;
       const isThisMonth = date >= monthStart && date <= monthEnd;
       const amt = Number(m.amount);
       const isOpening = m.movementType === 'opening';
-
       if (m.toAccount && accounts.includes(m.toAccount)) {
         if (isBeforeMonth || isOpening) opening += amt;
         else if (isThisMonth) monthFundsIn += amt;
@@ -475,27 +459,22 @@ function ExpandableAccountCard({
         else if (isThisMonth) monthFundsOut += amt;
       }
     });
-
     return { opening, monthSales, monthExpenses, monthFundsIn, monthFundsOut };
   }, [accountKey, monthStart, monthEnd, transactions, fundMovements]);
-
   const salesColor = isDark ? 'text-emerald-400' : 'text-emerald-600';
   const expenseColor = isDark ? 'text-rose-400' : 'text-rose-600';
   const fundsInColor = isDark ? 'text-sky-400' : 'text-indigo-600';
   const fundsOutColor = isDark ? 'text-orange-400' : 'text-orange-600';
-
   return (
     <div
-      className={`rounded-xl border transition-all duration-300 cursor-pointer overflow-hidden relative group h-fit
-        ${isExpanded ? `shadow-md ${colorMap.expandedBorder}` : `shadow-sm ${colorMap.border} hover:${colorMap.hoverBorder} hover:-translate-y-0.5`}
+      className={`rounded-xl border transition-all duration-300 min-w-0 overflow-hidden relative group h-fit
+        ${isExpanded ? `shadow-md ${colorMap.expandedBorder}` : `shadow-sm ${colorMap.border}`}
         ${colorMap.bg}
       `}
-      onClick={() => setIsExpanded(!isExpanded)}
     >
       {isDark && (
         <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-500/20 rounded-full blur-2xl transition-all duration-500 z-0 pointer-events-none group-hover:bg-amber-500/30"></div>
       )}
-
       <div className="p-4 relative z-10">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -510,21 +489,31 @@ function ExpandableAccountCard({
               {title}
             </span>
           </div>
-          <div className={`${colorMap.titleText} opacity-50`}>
-            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </div>
         </div>
-
         <p
-          className={`text-xl sm:text-2xl font-black tabular-nums tracking-tight ${colorMap.balanceText}`}
+          className={`break-words text-xl font-bold tabular-nums tracking-tight ${colorMap.balanceText}`}
         >
           ৳{balance.toLocaleString()}
         </p>
-
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={panelId}
+          aria-label={`${isExpanded ? 'Hide' : 'View'} breakdown: ${title}`}
+          onClick={() => setIsExpanded((value) => !value)}
+          className={`mt-2 inline-flex items-center gap-1 rounded-lg py-1.5 text-xs font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${colorMap.titleText}`}
+        >
+          {isExpanded ? 'Hide breakdown' : 'View breakdown'}
+          {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
         {isExpanded && (
           <div
+            id={panelId}
             className={`mt-4 pt-3 border-t animate-in slide-in-from-top-2 fade-in duration-200 ${isDark ? 'border-white/10 text-white/80' : 'border-slate-200 text-slate-600'}`}
           >
+            <p className="mb-3 text-[11px] font-semibold">
+              {monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} movements
+            </p>
             <div className="space-y-2 text-[11px]">
               <div className="flex justify-between items-center">
                 <span>Opening</span>
@@ -532,7 +521,6 @@ function ExpandableAccountCard({
                   ৳{breakdown.opening.toLocaleString()}
                 </span>
               </div>
-
               {accountKey !== 'reserve' && (
                 <>
                   <div className="flex justify-between items-center">
@@ -549,7 +537,6 @@ function ExpandableAccountCard({
                   </div>
                 </>
               )}
-
               <div className="flex justify-between items-center">
                 <span className={`font-medium ${fundsInColor}`}>Funds In (+)</span>
                 <span className={`font-bold ${fundsInColor}`}>
@@ -569,15 +556,12 @@ function ExpandableAccountCard({
     </div>
   );
 }
-
 // ─── Sub-panels ───────────────────────────────────────────────────────────────
-
 function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => void }) {
   const { addTransaction } = useERPActions();
   const [isSubmittingToServer, setIsSubmittingToServer] = useState(false);
   const [saleDate, setSaleDate] = useState(todayISO);
   const maxSelectableDate = todayISO();
-
   const {
     register,
     handleSubmit,
@@ -595,10 +579,8 @@ function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
       isAdjustment: false,
     },
   });
-
   const selectedChannel = watch('channel');
   const selectedPaymentMethod = watch('method');
-
   const onSubmit = async (formData: SaleFormData) => {
     try {
       setIsSubmittingToServer(true);
@@ -631,10 +613,8 @@ function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
       setIsSubmittingToServer(false);
     }
   };
-
   const fieldClass = (hasError: boolean) =>
     `w-full px-3 py-2 rounded-xl border text-sm outline-none transition-all ${hasError ? 'border-red-300 focus:ring-2 focus:ring-red-100' : 'border-slate-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100'}`;
-
   return (
     <div className="border border-slate-200 rounded-xl overflow-hidden h-fit">
       <button
@@ -650,7 +630,6 @@ function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
           className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
-
       {isOpen && (
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -755,9 +734,7 @@ function QuickSaleForm({ isOpen, onToggle }: { isOpen: boolean; onToggle: () => 
     </div>
   );
 }
-
 // ─── Missing Hooks Restored ───────────────────────────────────────────────────
-
 function useTodayStats(transactions: Transaction[]) {
   return useMemo(() => {
     const todayKey = todayBusinessKey();
@@ -768,11 +745,9 @@ function useTodayStats(transactions: Transaction[]) {
       bkash = 0,
       bank = 0;
     const todaySales: Transaction[] = [];
-
     for (const transaction of transactions) {
       if (!transaction.date) continue;
       if (businessDateKey(transaction.date) !== todayKey) continue;
-
       if (transaction.type === 'sale') {
         revenue += Number(transaction.amount);
         orderCount++;
@@ -787,18 +762,16 @@ function useTodayStats(transactions: Transaction[]) {
         if (transaction.method === 'bkash') bkash -= Number(transaction.amount);
         if (transaction.method === 'bank') bank -= Number(transaction.amount);
       }
-      if (transaction.type === 'expense_product' || transaction.type === 'expense_fixed') {
+      if (isLedgerExpense(transaction.type)) {
         expenses += Number(transaction.amount);
       }
     }
-
     const topOrders = [...todaySales]
       .sort((a, b) => Number(b.amount) - Number(a.amount))
       .slice(0, 3);
     return { revenue, orderCount, expenses, cash, bkash, bank, topOrders };
   }, [transactions]);
 }
-
 function useInsights(
   period: {
     cash: number;
@@ -811,19 +784,19 @@ function useInsights(
     totalSales: number;
     profit: number;
   },
-  stats: ReturnType<typeof useERP>['stats']
+  stats: ReturnType<typeof useERP>['stats'],
+  costCompletenessNotice: string | undefined
 ): InsightItem[] {
   return useMemo(() => {
     const insightList: InsightItem[] = [];
     const profitMargin = period.totalSales > 0 ? (period.profit / period.totalSales) * 100 : 0;
     const expenseRatio = period.totalSales > 0 ? (period.expenses / period.totalSales) * 100 : 0;
-
     if (stats.cashBalance < 2_000)
       insightList.push({
         type: 'danger',
         icon: AlertTriangle,
         title: 'Low Cash Drawer',
-        desc: `Only ৳${stats.cashBalance.toLocaleString()} in cash. Refill or release from fund.`,
+        desc: `Only ৳${stats.cashBalance.toLocaleString()} in cash. Add cash from Cash & Accounts.`,
       });
     else if (stats.cashBalance > 30_000)
       insightList.push({
@@ -832,13 +805,12 @@ function useInsights(
         title: 'Excess Cash',
         desc: `৳${stats.cashBalance.toLocaleString()} in drawer — consider moving to reserve.`,
       });
-
-    if (profitMargin > 20)
+    if (profitMargin > 20 && !costCompletenessNotice)
       insightList.push({
-        type: 'success',
-        icon: CheckCircle2,
-        title: 'Healthy Profit',
-        desc: `${profitMargin.toFixed(1)}% margin this period — excellent performance.`,
+        type: 'info',
+        icon: AlertCircle,
+        title: 'Recorded Profit Margin',
+        desc: `${profitMargin.toFixed(1)}% based on recorded expenses. Verify all costs before assessing performance.`,
       });
     else if (expenseRatio > 80 && period.totalSales > 0)
       insightList.push({
@@ -847,7 +819,6 @@ function useInsights(
         title: 'High Expense Ratio',
         desc: `Expenses are ${expenseRatio.toFixed(0)}% of revenue — margins under pressure.`,
       });
-
     if (period.totalSales > 0) {
       const dayOfMonth = new Date().getDate();
       const daysInMonth = new Date(
@@ -863,24 +834,19 @@ function useInsights(
         desc: `On pace for ~৳${projectedMonthlyRevenue.toLocaleString()} this month (Day ${dayOfMonth}/${daysInMonth}).`,
       });
     }
-
     return insightList.slice(0, 4);
-  }, [period, stats]);
+  }, [period, stats, costCompletenessNotice]);
 }
-
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
-
 export default function Dashboard() {
   const { transactions, stats, fundMovements } = useERP();
   const canMutate = useCanMutate();
   const [showSaleForm, setShowSaleForm] = useState(false);
-
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>({
     year: currentDate.getFullYear(),
     month: currentDate.getMonth(),
   });
-
   const monthStart = useMemo(
     () => new Date(selectedMonth.year, selectedMonth.month, 1),
     [selectedMonth]
@@ -889,13 +855,11 @@ export default function Dashboard() {
     () => new Date(selectedMonth.year, selectedMonth.month + 1, 0, 23, 59, 59, 999),
     [selectedMonth]
   );
-
   const today = useTodayStats(transactions);
   const monthTransactions = useMemo(
     () => transactions.filter((t) => t.date && t.date >= monthStart && t.date <= monthEnd),
     [monthStart, monthEnd, transactions]
   );
-
   const period = useMemo(() => {
     let cash = 0,
       bkash = 0,
@@ -918,7 +882,7 @@ export default function Dashboard() {
         if (t.method === 'bkash') bkash -= Number(t.amount);
         if (t.method === 'bank') bank -= Number(t.amount);
       }
-      if (t.type === 'expense_product' || t.type === 'expense_fixed') expenses += Number(t.amount);
+      if (isLedgerExpense(t.type)) expenses += Number(t.amount);
     }
     const totalSales = Math.max(0, cash + bkash + bank);
     return {
@@ -933,18 +897,21 @@ export default function Dashboard() {
       profit: totalSales - expenses,
     };
   }, [monthTransactions]);
-
-  const insights = useInsights(period, stats);
+  const recordedProductCosts = monthTransactions
+    .filter((transaction) => transaction.type === 'expense_product')
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const costCompletenessNotice =
+    period.totalSales > 0 && recordedProductCosts <= 0
+      ? 'No purchases recorded for this period. Profit and margins use recorded expenses only and may be overstated. Record or verify purchases before assessing performance.'
+      : undefined;
+  const insights = useInsights(period, stats, costCompletenessNotice);
   const monthLabel = useMemo(
     () => monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     [monthStart]
   );
-  const periodLabel = useMemo(() => ({ title: 'This Month', subtitle: monthLabel }), [monthLabel]);
-
   const methodTotal = Math.max(1, period.cash + period.bkash + period.bank);
   const channelTotal = Math.max(1, period.inStore + period.foodpanda + period.foodi);
   const todayTotal = Math.max(1, today.cash + today.bkash + today.bank);
-
   const changeMonth = (offset: number) =>
     setSelectedMonth((p) => {
       const n = new Date(p.year, p.month + offset, 1);
@@ -953,159 +920,124 @@ export default function Dashboard() {
   const isCurrentMonth =
     selectedMonth.year === currentDate.getFullYear() &&
     selectedMonth.month === currentDate.getMonth();
-
   return (
-    <div className="space-y-5 pb-10">
-      {/* ── Page Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Dashboard</h1>
-          <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
-            <CalendarDays size={13} /> {formatDate(new Date())}{' '}
-            <span className="mx-1 text-slate-300">·</span> <Clock size={13} /> <LiveClock />
+    <div className="min-w-0 space-y-4 pb-6">
+      {/* The app shell already supplies the Dashboard heading. */}
+      <section aria-label="Today's activity" className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-800">Today's activity</h2>
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <CalendarDays size={13} /> {formatDate(new Date())}
+            <span className="mx-1 text-slate-300">·</span>
+            <Clock size={13} />
+            <LiveClock />
           </p>
         </div>
-      </div>
-
-      {/* ── Main Two-Column Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-        {/* LEFT — Today's Overview */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-fit">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Live Overview
-              </p>
-              <h2 className="text-base font-bold mt-0.5 text-slate-800">Today's Activity</h2>
-            </div>
-            <span className="flex h-3 w-3 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3 items-start">
+          <ExpandableRevenueCard
+            revenue={today.revenue}
+            orderCount={today.orderCount}
+            cash={today.cash}
+            bkash={today.bkash}
+            bank={today.bank}
+            total={todayTotal}
+          />
+          <div className="min-w-0 rounded-xl border border-rose-100 bg-white p-4">
+            <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <TrendingDown size={15} className="text-rose-600" /> Today's expenses
+            </p>
+            <p className="mt-2 break-words text-2xl font-bold tabular-nums text-rose-700">
+              ৳{today.expenses.toLocaleString()}
+            </p>
+            <p className="mt-3 text-xs text-slate-500">Fixed expenses and purchases</p>
           </div>
-
-          <div className="p-4 sm:p-5 space-y-5 flex-1">
-            <ExpandableRevenueCard
-              revenue={today.revenue}
-              orderCount={today.orderCount}
-              cash={today.cash}
-              bkash={today.bkash}
-              bank={today.bank}
-              total={todayTotal}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingDown size={13} className="text-rose-600 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-rose-500">
-                    Expenses
-                  </span>
-                </div>
-                <p className="text-xl font-black tabular-nums text-rose-700">
-                  ৳{today.expenses.toLocaleString()}
-                </p>
-              </div>
-              <div
-                className={`rounded-xl p-3.5 border ${stats.cashBalance < 2_000 ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Wallet
-                    size={13}
-                    className={stats.cashBalance < 2_000 ? 'text-red-600' : 'text-slate-600'}
-                  />
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    Cash Drawer
-                  </span>
-                </div>
-                <p
-                  className={`text-xl font-black tabular-nums ${stats.cashBalance < 2_000 ? 'text-red-600' : 'text-slate-700'}`}
-                >
-                  ৳{stats.cashBalance.toLocaleString()}
-                </p>
-                {stats.cashBalance < 2_000 && (
-                  <p className="text-[10px] text-red-500 font-semibold mt-0.5">⚠ Low balance</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Divider label="Top Orders Today" />
-              {today.topOrders.length === 0 ? (
-                <div className="flex flex-col items-center py-8 text-center">
-                  <ShoppingCart size={28} className="text-slate-200 mb-2" />
-                  <p className="text-sm font-semibold text-slate-400">No orders yet today</p>
-                </div>
-              ) : (
-                <div>
-                  {today.topOrders.map((order: Transaction, index: number) => (
-                    <div
-                      key={order.id}
-                      className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0"
-                    >
-                      <span className="w-5 text-[10px] font-black text-slate-400 tabular-nums shrink-0">
-                        #{index + 1}
-                      </span>
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${order.method === 'cash' ? 'bg-emerald-400' : order.method === 'bkash' ? 'bg-pink-400' : 'bg-blue-400'}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate">
-                          {order.description}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {order.date ? formatTime(new Date(order.date)) : ''}
-                          {order.channel && (
-                            <span className="ml-1.5 capitalize">
-                              {order.channel.replace('_', '-')}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <span className="text-sm font-bold text-emerald-600 tabular-nums shrink-0">
-                        ৳{Number(order.amount).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {canMutate && (
-              <QuickSaleForm isOpen={showSaleForm} onToggle={() => setShowSaleForm((p) => !p)} />
-            )}
+          <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+            <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+              <Wallet size={15} /> Cash drawer
+            </p>
+            <p
+              className={`mt-2 break-words text-2xl font-bold tabular-nums ${stats.cashBalance < 2_000 ? 'text-rose-600' : 'text-slate-800'}`}
+            >
+              ৳{stats.cashBalance.toLocaleString()}
+            </p>
+            <p
+              className={`mt-3 text-xs ${stats.cashBalance < 2_000 ? 'font-semibold text-rose-600' : 'text-slate-500'}`}
+            >
+              {stats.cashBalance < 2_000 ? 'Low balance' : 'Live account balance'}
+            </p>
           </div>
         </div>
-
-        {/* RIGHT — Period Sales Overview */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-fit">
-          <div className="px-5 py-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between shrink-0">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                Sales Overview
-              </p>
-              <h2 className="text-base font-bold mt-0.5">{periodLabel.title}</h2>
-              <p className="text-[11px] text-slate-400 mt-0.5">{periodLabel.subtitle}</p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <MonthNavigator
-                label={monthLabel}
-                onPrev={() => changeMonth(-1)}
-                onNext={() => changeMonth(1)}
-                disableNext={isCurrentMonth}
-              />
-              <div className="text-right">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                  Total Revenue
-                </p>
-                <p className="text-3xl font-black tabular-nums text-amber-400">
-                  ৳{period.totalSales.toLocaleString()}
-                </p>
-              </div>
-            </div>
+      </section>
+      <section
+        aria-label="Monthly sales overview"
+        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-800">
+              {isCurrentMonth ? 'This month' : 'Monthly overview'}
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">{monthLabel}</p>
           </div>
-
-          <div className="p-5 space-y-6 flex-1">
+          <MonthNavigator
+            label={monthLabel}
+            onPrev={() => changeMonth(-1)}
+            onNext={() => changeMonth(1)}
+            disableNext={isCurrentMonth}
+          />
+        </div>
+        {costCompletenessNotice && (
+          <div
+            role="note"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            <p className="font-semibold">Cost completeness: review required</p>
+            <p className="mt-1 leading-relaxed">{costCompletenessNotice}</p>
+          </div>
+        )}
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-3">
+          {[
+            {
+              label: 'Revenue',
+              value: period.totalSales,
+              icon: TrendingUp,
+              color: 'text-emerald-700',
+              bg: 'bg-emerald-50',
+            },
+            {
+              label: 'Expenses',
+              value: period.expenses,
+              icon: TrendingDown,
+              color: 'text-rose-600',
+              bg: 'bg-rose-50',
+            },
+            {
+              label: 'Net Profit',
+              value: period.profit,
+              icon: CircleDollarSign,
+              color: period.profit >= 0 ? 'text-amber-700' : 'text-rose-600',
+              bg: period.profit >= 0 ? 'bg-amber-50' : 'bg-rose-50',
+            },
+          ].map(({ label, value, icon: Icon, color, bg }) => (
+            <div key={label} className={`rounded-xl p-3.5 ${bg} min-w-0`}>
+              <Icon size={16} className={`${color} mb-1.5`} />
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                {label}
+              </p>
+              <p className={`break-words text-xl font-bold tabular-nums ${color}`}>
+                {value < 0 ? '−' : ''}৳{Math.abs(value).toLocaleString()}
+              </p>
+              {label === 'Net Profit' && period.totalSales > 0 && (
+                <p className={`text-[10px] font-semibold mt-0.5 ${color} opacity-70`}>
+                  {((period.profit / period.totalSales) * 100).toFixed(1)}% margin
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        <BreakdownPanel title="Payments and sales channels">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-3">
               <Divider label="By Payment Method" />
               {PAYMENT_METHODS.map((method) => (
@@ -1129,7 +1061,6 @@ export default function Dashboard() {
                 />
               )}
             </div>
-
             <div className="space-y-3">
               <Divider label="By Sales Channel" />
               {SALES_CHANNELS.map((channel) => (
@@ -1153,57 +1084,12 @@ export default function Dashboard() {
                 />
               )}
             </div>
-
-            <div>
-              <Divider label="Profit Summary" />
-              <div className="grid grid-cols-3 gap-3 mt-3">
-                {[
-                  {
-                    label: 'Revenue',
-                    value: period.totalSales,
-                    icon: TrendingUp,
-                    color: 'text-emerald-700',
-                    bg: 'bg-emerald-50',
-                  },
-                  {
-                    label: 'Expenses',
-                    value: period.expenses,
-                    icon: TrendingDown,
-                    color: 'text-rose-600',
-                    bg: 'bg-rose-50',
-                  },
-                  {
-                    label: 'Net Profit',
-                    value: period.profit,
-                    icon: CircleDollarSign,
-                    color: period.profit >= 0 ? 'text-amber-700' : 'text-rose-600',
-                    bg: period.profit >= 0 ? 'bg-amber-50' : 'bg-rose-50',
-                  },
-                ].map(({ label, value, icon: Icon, color, bg }) => (
-                  <div key={label} className={`rounded-xl p-3.5 ${bg} text-center`}>
-                    <Icon size={16} className={`${color} mx-auto mb-1.5`} />
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
-                      {label}
-                    </p>
-                    <p className={`text-base font-black tabular-nums ${color}`}>
-                      {value < 0 ? '−' : ''}৳{Math.abs(value).toLocaleString()}
-                    </p>
-                    {label === 'Net Profit' && period.totalSales > 0 && (
-                      <p className={`text-[10px] font-semibold mt-0.5 ${color} opacity-70`}>
-                        {((period.profit / period.totalSales) * 100).toFixed(1)}% margin
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        </div>
-      </div>
-
+        </BreakdownPanel>
+      </section>
       {/* ── HORIZONTAL LIVE ACCOUNT BALANCES STRIP WITH INLINE EXPANDERS ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2 items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet size={16} className="text-slate-600" />
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
@@ -1211,11 +1097,10 @@ export default function Dashboard() {
             </h2>
           </div>
           <span className="text-[10px] font-semibold text-slate-400 bg-slate-200 px-2 py-0.5 rounded-md hidden sm:inline-block">
-            Click any card to expand
+            Live balances · selected-month breakdowns
           </span>
         </div>
-
-        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 items-start">
+        <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4 items-start">
           <ExpandableAccountCard
             accountKey="cash"
             title="Cash Drawer"
@@ -1236,7 +1121,6 @@ export default function Dashboard() {
               balanceText: 'text-emerald-700',
             }}
           />
-
           <ExpandableAccountCard
             accountKey="bkash"
             title="bKash Wallet"
@@ -1257,7 +1141,6 @@ export default function Dashboard() {
               balanceText: 'text-pink-700',
             }}
           />
-
           <ExpandableAccountCard
             accountKey="bank"
             title="Bank / Card"
@@ -1278,7 +1161,6 @@ export default function Dashboard() {
               balanceText: 'text-blue-700',
             }}
           />
-
           <ExpandableAccountCard
             accountKey="reserve"
             title="Reserve Fund"
@@ -1299,7 +1181,6 @@ export default function Dashboard() {
               balanceText: 'text-purple-700',
             }}
           />
-
           {/* Special Dark Master Card for Total Liquidity */}
           <div className="col-span-1 sm:col-span-2 lg:col-span-1">
             <ExpandableAccountCard
@@ -1327,6 +1208,52 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+        <BreakdownPanel title="Top orders today">
+          {today.topOrders.length === 0 ? (
+            <div className="flex flex-col items-center py-8 text-center">
+              <ShoppingCart size={28} className="text-slate-200 mb-2" />
+              <p className="text-sm font-semibold text-slate-400">No orders yet today</p>
+            </div>
+          ) : (
+            <div>
+              {today.topOrders.map((order: Transaction, index: number) => (
+                <div
+                  key={order.id}
+                  className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0"
+                >
+                  <span className="w-5 text-[10px] font-black text-slate-400 tabular-nums shrink-0">
+                    #{index + 1}
+                  </span>
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${order.method === 'cash' ? 'bg-emerald-400' : order.method === 'bkash' ? 'bg-pink-400' : 'bg-blue-400'}`}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">
+                      {order.description}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {order.date ? formatTime(new Date(order.date)) : ''}
+                      {order.channel && (
+                        <span className="ml-1.5 capitalize">{order.channel.replace('_', '-')}</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold text-emerald-600 tabular-nums shrink-0">
+                    ৳{Number(order.amount).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </BreakdownPanel>
+        {canMutate && (
+          <QuickSaleForm
+            isOpen={showSaleForm}
+            onToggle={() => setShowSaleForm((value) => !value)}
+          />
+        )}
+      </div>
       {/* ── Smart Insights row ── */}
       {insights.length > 0 && (
         <section>

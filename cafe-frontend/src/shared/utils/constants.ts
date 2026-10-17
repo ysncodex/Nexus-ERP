@@ -59,6 +59,7 @@ export const TRANSACTION_TYPES = {
   SALE_ADJUSTMENT: 'sale_adjustment',
   EXPENSE_PRODUCT: 'expense_product',
   EXPENSE_FIXED: 'expense_fixed',
+  EXPENSE_CONSUMABLE: 'expense_consumable',
 } as const;
 
 // Currency

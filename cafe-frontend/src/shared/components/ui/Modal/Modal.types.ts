@@ -32,6 +32,6 @@ export interface ManageListModalProps {
   title: string;
   items: string[];
   emptyText?: string;
-  onRename: (oldValue: string, newValue: string) => void;
-  onDelete: (value: string) => void;
+  onRename: (oldValue: string, newValue: string) => void | Promise<void>;
+  onDelete: (value: string) => void | Promise<void>;
 }

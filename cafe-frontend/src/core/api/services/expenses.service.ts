@@ -3,7 +3,7 @@ import type { Transaction } from '@/core/types';
 
 // Type definitions for expenses
 export interface ExpenseCreateData {
-  type: 'expense_product' | 'expense_fixed';
+  type: 'expense_product' | 'expense_fixed' | 'expense_consumable';
   category: string;
   item: string;
   supplier?: string;
@@ -20,6 +20,7 @@ export interface ExpenseStats {
   totalExpenses: number;
   productCosts: number;
   fixedCosts: number;
+  consumableCosts: number;
   expensesByCategory: Record<string, number>;
 }
 

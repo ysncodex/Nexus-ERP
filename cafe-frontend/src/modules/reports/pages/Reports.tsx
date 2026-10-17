@@ -7,7 +7,6 @@
  *   3. P&L Statement  → expandable cost lines
  *   4. Details        → daily trend + sales channels
  */
-
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Calendar,
@@ -28,18 +27,20 @@ import {
 } from 'lucide-react';
 import { useERP } from '@/core/context/useERP';
 import { computeStats } from '@/core/context/erp/stats';
-import { isPaidSale } from '@/core/types/transaction.types';
+import { isLedgerExpense, isPaidSale } from '@/core/types/transaction.types';
 import { formatCurrency } from '@/shared/utils/formatters';
 import { ExportDropdown, createReportExportConfig } from '@/shared/export';
-
 type ComparisonPeriod = 'none' | 'previous' | 'year';
+function isBankFeeDescription(value: string): boolean {
+  return /\b(?:card|bank|pos|merchant|payment processing)[\s-]+(?:(?:processing|transaction)[\s-]+)?(?:fees?|charges?)\b/i.test(
+    value
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
-
 function formatPeriodLabel(from: Date | null, to: Date | null): string {
   if (!from || !to) return 'Current selection';
   const a = startOfDay(from);
@@ -61,17 +62,14 @@ function formatPeriodLabel(from: Date | null, to: Date | null): string {
     });
   return `${fmt(a, !sameYear)} – ${fmt(b, true)}`;
 }
-
 function pctOf(total: number, part: number) {
   return total > 0 ? ((part / total) * 100).toFixed(1) : '0.0';
 }
-
 const COMPARISON_OPTIONS: { value: ComparisonPeriod; label: string }[] = [
   { value: 'none', label: 'No comparison' },
   { value: 'previous', label: 'vs Previous period' },
   { value: 'year', label: 'vs Last year' },
 ];
-
 function ComparisonSelect({
   value,
   onChange,
@@ -82,7 +80,6 @@ function ComparisonSelect({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = COMPARISON_OPTIONS.find((o) => o.value === value)?.label ?? 'No comparison';
-
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -90,7 +87,6 @@ function ComparisonSelect({
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
-
   return (
     <div className="relative" ref={ref}>
       <button
@@ -135,25 +131,27 @@ function ComparisonSelect({
     </div>
   );
 }
-
 // ─── Expense Breakdown Drawer ─────────────────────────────────────────────────
-
 function ExpensesDrawer({
   open,
   onClose,
   productCosts,
+  consumableCosts,
   fixedCosts,
   totalProductCost,
+  totalConsumableCost,
   totalFixedCost,
 }: {
   open: boolean;
   onClose: () => void;
   productCosts: Array<{ name: string; cost: number; qty: number; unit: string }>;
+  consumableCosts: Array<{ name: string; amount: number }>;
   fixedCosts: Array<{ name: string; amount: number }>;
   totalProductCost: number;
+  totalConsumableCost: number;
   totalFixedCost: number;
 }) {
-  const total = totalProductCost + totalFixedCost;
+  const total = totalProductCost + totalConsumableCost + totalFixedCost;
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />}
@@ -172,7 +170,7 @@ function ExpensesDrawer({
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           <section>
             <div className="flex justify-between mb-2">
-              <h4 className="text-sm font-bold text-slate-700">Variable (COGS)</h4>
+              <h4 className="text-sm font-bold text-slate-700">Purchases (COGS)</h4>
               <span className="text-sm font-bold text-orange-600">
                 {formatCurrency(totalProductCost)}
               </span>
@@ -188,13 +186,35 @@ function ExpensesDrawer({
                 </div>
               ))}
               {productCosts.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-3">No product costs</p>
+                <p className="text-sm text-slate-400 text-center py-3">No purchases</p>
               )}
             </div>
           </section>
           <section>
             <div className="flex justify-between mb-2">
-              <h4 className="text-sm font-bold text-slate-700">Fixed (OpEx)</h4>
+              <h4 className="text-sm font-bold text-slate-700">Consumables & Packaging</h4>
+              <span className="text-sm font-bold text-teal-600">
+                {formatCurrency(totalConsumableCost)}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {consumableCosts.map((item) => (
+                <div
+                  key={item.name}
+                  className="flex justify-between text-sm px-3 py-2 bg-teal-50 rounded-lg"
+                >
+                  <span className="text-slate-700">{item.name}</span>
+                  <span className="font-semibold text-teal-600">{formatCurrency(item.amount)}</span>
+                </div>
+              ))}
+              {consumableCosts.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-3">No consumables</p>
+              )}
+            </div>
+          </section>
+          <section>
+            <div className="flex justify-between mb-2">
+              <h4 className="text-sm font-bold text-slate-700">Fixed expenses</h4>
               <span className="text-sm font-bold text-purple-600">
                 {formatCurrency(totalFixedCost)}
               </span>
@@ -212,7 +232,7 @@ function ExpensesDrawer({
                 </div>
               ))}
               {fixedCosts.length === 0 && (
-                <p className="text-sm text-slate-400 text-center py-3">No fixed costs</p>
+                <p className="text-sm text-slate-400 text-center py-3">No fixed expenses</p>
               )}
             </div>
           </section>
@@ -221,9 +241,7 @@ function ExpensesDrawer({
     </>
   );
 }
-
 // ─── Small UI pieces ──────────────────────────────────────────────────────────
-
 function DeltaBadge({
   change,
   pct,
@@ -245,7 +263,6 @@ function DeltaBadge({
     </span>
   );
 }
-
 function SummaryCard({
   label,
   value,
@@ -269,7 +286,6 @@ function SummaryCard({
   };
   const isColored = tone === 'positive' || tone === 'negative';
   const Tag = onClick ? 'button' : 'div';
-
   return (
     <Tag
       onClick={onClick}
@@ -295,7 +311,6 @@ function SummaryCard({
     </Tag>
   );
 }
-
 function Divider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -306,7 +321,6 @@ function Divider({ label }: { label: string }) {
     </div>
   );
 }
-
 const CHANNELS = [
   {
     key: 'inStore' as const,
@@ -333,19 +347,16 @@ const CHANNELS = [
     bg: 'bg-violet-50',
   },
 ];
-
 interface SelectedMonth {
   year: number;
   month: number;
 }
-
 interface MonthNavigatorProps {
   label: string;
   onPrev: () => void;
   onNext: () => void;
   disableNext: boolean;
 }
-
 function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorProps) {
   return (
     <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1.5 shadow-sm">
@@ -372,13 +383,10 @@ function MonthNavigator({ label, onPrev, onNext, disableNext }: MonthNavigatorPr
     </div>
   );
 }
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
-
 export default function Reports() {
   const { transactions, fundMovements } = useERP();
   const now = new Date();
-
   const [comparisonPeriod, setComparisonPeriod] = useState<ComparisonPeriod>('none');
   const [selectedMonth, setSelectedMonth] = useState<SelectedMonth>({
     year: now.getFullYear(),
@@ -386,8 +394,8 @@ export default function Reports() {
   });
   const [expensesOpen, setExpensesOpen] = useState(false);
   const [cogsOpen, setCogsOpen] = useState(false);
+  const [consumablesOpen, setConsumablesOpen] = useState(false);
   const [opexOpen, setOpexOpen] = useState(false);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setExpensesOpen(false);
@@ -395,10 +403,8 @@ export default function Reports() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
   const isCurrentMonth =
     selectedMonth.year === now.getFullYear() && selectedMonth.month === now.getMonth();
-
   const monthLabel = useMemo(
     () =>
       new Date(selectedMonth.year, selectedMonth.month, 1).toLocaleDateString('en-US', {
@@ -407,7 +413,6 @@ export default function Reports() {
       }),
     [selectedMonth]
   );
-
   const monthStart = useMemo(
     () => new Date(selectedMonth.year, selectedMonth.month, 1),
     [selectedMonth]
@@ -416,7 +421,6 @@ export default function Reports() {
     () => new Date(selectedMonth.year, selectedMonth.month + 1, 0, 23, 59, 59, 999),
     [selectedMonth]
   );
-
   const monthTransactions = useMemo(
     () =>
       transactions.filter(
@@ -424,38 +428,43 @@ export default function Reports() {
       ),
     [transactions, monthStart, monthEnd]
   );
-
   const stats = useMemo(
     () => computeStats(transactions, monthTransactions, fundMovements),
     [transactions, monthTransactions, fundMovements]
   );
-
+  const costCompletenessNotice =
+    stats.totalSales > 0 && stats.totalProductCost <= 0
+      ? 'No purchases recorded for this period. Profit and margins use recorded expenses only and may be overstated. Record or verify purchases before assessing performance.'
+      : undefined;
+  const fixedCostGroups = useMemo(() => {
+    const groups = new Map<string, number>();
+    for (const item of stats.topFixed) {
+      const name = isBankFeeDescription(item.name) ? 'Bank Fees' : item.name;
+      groups.set(name, (groups.get(name) ?? 0) + item.amount);
+    }
+    return Array.from(groups, ([name, amount]) => ({ name, amount }));
+  }, [stats.topFixed]);
   const goToPrevMonth = () =>
     setSelectedMonth((prev) =>
       prev.month === 0
         ? { year: prev.year - 1, month: 11 }
         : { year: prev.year, month: prev.month - 1 }
     );
-
   const goToNextMonth = () =>
     setSelectedMonth((prev) =>
       prev.month === 11
         ? { year: prev.year + 1, month: 0 }
         : { year: prev.year, month: prev.month + 1 }
     );
-
   const resetToCurrentMonth = () => {
     const today = new Date();
     setSelectedMonth({ year: today.getFullYear(), month: today.getMonth() });
   };
-
   const comparison = useMemo(() => {
     if (comparisonPeriod === 'none') return null;
-
     const start = monthStart;
     const end = monthEnd;
     const days = Math.ceil((end.getTime() - start.getTime()) / 86_400_000);
-
     let cmpStart: Date;
     let cmpEnd: Date;
     if (comparisonPeriod === 'previous') {
@@ -469,7 +478,6 @@ export default function Reports() {
       cmpEnd = new Date(end);
       cmpEnd.setFullYear(cmpEnd.getFullYear() - 1);
     }
-
     const cmpTx = transactions.filter(
       (t) => t.date instanceof Date && t.date >= cmpStart && t.date <= cmpEnd
     );
@@ -477,10 +485,9 @@ export default function Reports() {
       .filter((t) => t.type === 'sale' || t.type === 'sale_adjustment')
       .reduce((s, t) => s + t.amount, 0);
     const expenses = cmpTx
-      .filter((t) => t.type === 'expense_product' || t.type === 'expense_fixed')
+      .filter((t) => isLedgerExpense(t.type))
       .reduce((s, t) => s + t.amount, 0);
     const profit = sales - expenses;
-
     return {
       label: comparisonPeriod === 'previous' ? 'previous period' : 'same period last year',
       salesChange: stats.totalSales - sales,
@@ -491,10 +498,8 @@ export default function Reports() {
       profitPct: profit !== 0 ? ((stats.profit - profit) / Math.abs(profit)) * 100 : 0,
     };
   }, [comparisonPeriod, monthStart, monthEnd, transactions, stats]);
-
   const profitMargin = stats.totalSales > 0 ? (stats.profit / stats.totalSales) * 100 : 0;
   const grossMargin = stats.totalSales > 0 ? (stats.grossProfit / stats.totalSales) * 100 : 0;
-
   const channels = useMemo(() => {
     const foodpanda = stats.foodpandaSales;
     const foodi = stats.foodiSales;
@@ -506,7 +511,6 @@ export default function Reports() {
       foodi: { revenue: foodi, share: (foodi / total) * 100 },
     };
   }, [stats]);
-
   const trendData = useMemo(() => {
     const map = new Map<string, { sales: number; expenses: number }>();
     for (const t of monthTransactions) {
@@ -514,7 +518,7 @@ export default function Reports() {
       const key = t.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const row = map.get(key) ?? { sales: 0, expenses: 0 };
       if (t.type === 'sale' || t.type === 'sale_adjustment') row.sales += t.amount;
-      else if (t.type === 'expense_product' || t.type === 'expense_fixed') row.expenses += t.amount;
+      else if (isLedgerExpense(t.type)) row.expenses += t.amount;
       map.set(key, row);
     }
     return [...map.entries()]
@@ -522,9 +526,7 @@ export default function Reports() {
       .slice(-7)
       .map(([date, data]) => ({ date, ...data }));
   }, [monthTransactions]);
-
   const maxBar = Math.max(...trendData.flatMap((d) => [d.sales, d.expenses]), 1);
-
   const giftStats = useMemo(() => {
     let itemCount = 0;
     let totalValue = 0;
@@ -535,10 +537,8 @@ export default function Reports() {
     }
     return { itemCount, totalValue };
   }, [monthTransactions]);
-
   const periodLabel = formatPeriodLabel(monthStart, monthEnd);
   const hasData = monthTransactions.length > 0;
-
   const reportExportInput = useMemo(
     () => ({
       stats,
@@ -548,35 +548,42 @@ export default function Reports() {
       expenseRatio: pctOf(stats.totalSales, stats.totalExpenses),
       channels,
       trendData,
+      costCompletenessNotice,
+      fixedCostGroups,
     }),
-    [periodLabel, stats, profitMargin, grossMargin, channels, trendData]
+    [
+      periodLabel,
+      stats,
+      profitMargin,
+      grossMargin,
+      channels,
+      trendData,
+      costCompletenessNotice,
+      fixedCostGroups,
+    ]
   );
-
   const exportConfig = useMemo(
     () => createReportExportConfig(reportExportInput),
     [reportExportInput]
   );
-
   return (
     <div className="space-y-6 pb-16 animate-in slide-in-from-bottom-2">
       <ExpensesDrawer
         open={expensesOpen}
         onClose={() => setExpensesOpen(false)}
         productCosts={stats.topProducts}
-        fixedCosts={stats.topFixed}
+        consumableCosts={stats.topConsumables}
+        fixedCosts={fixedCostGroups}
         totalProductCost={stats.totalProductCost}
+        totalConsumableCost={stats.totalConsumableCost}
         totalFixedCost={stats.totalFixedCost}
       />
-
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-5 border-b border-slate-200">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Financial Report</h2>
-          <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
-            <Calendar size={14} />
-            {periodLabel}
-          </p>
-        </div>
+        <p className="text-sm text-erp-secondary flex items-center gap-1.5">
+          <Calendar size={14} aria-hidden="true" />
+          {periodLabel}
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             label={monthLabel}
@@ -588,7 +595,6 @@ export default function Reports() {
           <ExportDropdown config={exportConfig} disabled={!hasData} />
         </div>
       </div>
-
       {/* Empty state */}
       {!hasData && (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
@@ -603,9 +609,17 @@ export default function Reports() {
           </button>
         </div>
       )}
-
       {hasData && (
         <>
+          {costCompletenessNotice && (
+            <div
+              role="note"
+              className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            >
+              <p className="font-semibold">Cost completeness: review required</p>
+              <p className="mt-1 leading-relaxed">{costCompletenessNotice}</p>
+            </div>
+          )}
           {/* Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SummaryCard
@@ -663,7 +677,6 @@ export default function Reports() {
               </div>
             </div>
           </div>
-
           {giftStats.itemCount > 0 && (
             <div className="flex items-center gap-4 p-4 rounded-xl border border-emerald-200 bg-emerald-50/60">
               <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
@@ -678,7 +691,6 @@ export default function Reports() {
               </div>
             </div>
           )}
-
           {/* P&L + Channels */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Profit & Loss */}
@@ -698,7 +710,6 @@ export default function Reports() {
                     <span className="text-xs text-slate-400 ml-2">100%</span>
                   </div>
                 </div>
-
                 {/* COGS */}
                 <div>
                   <button
@@ -707,7 +718,7 @@ export default function Reports() {
                   >
                     <span className="flex items-center gap-1.5 text-rose-600 font-medium">
                       {cogsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      (−) Variable Costs
+                      (−) Purchases (COGS)
                     </span>
                     <div className="text-right">
                       <span className="font-bold text-rose-600">
@@ -734,7 +745,6 @@ export default function Reports() {
                     </div>
                   )}
                 </div>
-
                 {/* Gross profit */}
                 <div className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg">
                   <span className="font-semibold text-slate-700">Gross Profit</span>
@@ -749,7 +759,40 @@ export default function Reports() {
                     </span>
                   </div>
                 </div>
-
+                <div>
+                  <button
+                    onClick={() => setConsumablesOpen((v) => !v)}
+                    className="w-full flex justify-between items-center group"
+                  >
+                    <span className="flex items-center gap-1.5 text-teal-700 font-medium">
+                      {consumablesOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      (−) Consumables & Packaging
+                    </span>
+                    <div className="text-right">
+                      <span className="font-bold text-teal-700">
+                        ({formatCurrency(stats.totalConsumableCost)})
+                      </span>
+                      <span className="text-xs text-teal-500 ml-2">
+                        ({pctOf(stats.totalSales, stats.totalConsumableCost)}%)
+                      </span>
+                    </div>
+                  </button>
+                  {consumablesOpen && stats.topConsumables.length > 0 && (
+                    <div className="mt-2 ml-5 space-y-1 border-l-2 border-teal-100 pl-3">
+                      {stats.topConsumables.map((item) => (
+                        <div
+                          key={item.name}
+                          className="flex justify-between text-sm text-slate-600 py-0.5"
+                        >
+                          <span>{item.name}</span>
+                          <span className="font-medium text-teal-600">
+                            {formatCurrency(item.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {/* OpEx */}
                 <div>
                   <button
@@ -758,7 +801,7 @@ export default function Reports() {
                   >
                     <span className="flex items-center gap-1.5 text-purple-600 font-medium">
                       {opexOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      (−) Fixed Costs
+                      (−) Fixed Expenses
                     </span>
                     <div className="text-right">
                       <span className="font-bold text-purple-600">
@@ -769,9 +812,9 @@ export default function Reports() {
                       </span>
                     </div>
                   </button>
-                  {opexOpen && stats.topFixed.length > 0 && (
+                  {opexOpen && fixedCostGroups.length > 0 && (
                     <div className="mt-2 ml-5 space-y-1 border-l-2 border-purple-100 pl-3">
-                      {stats.topFixed.map((item) => (
+                      {fixedCostGroups.map((item) => (
                         <div
                           key={item.name}
                           className="flex justify-between text-sm text-slate-600 py-0.5"
@@ -785,7 +828,6 @@ export default function Reports() {
                     </div>
                   )}
                 </div>
-
                 <div className="border-t-2 border-slate-900 pt-4 flex justify-between items-center">
                   <span
                     className={`text-lg font-black uppercase ${stats.profit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}
@@ -800,7 +842,6 @@ export default function Reports() {
                 </div>
               </div>
             </div>
-
             {/* Sales channels */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100">
@@ -842,11 +883,10 @@ export default function Reports() {
               </div>
             </div>
           </div>
-
           {/* Daily trend */}
           {trendData.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-xl p-6">
-              <Divider label="Daily Trend (last 7 days)" />
+              <Divider label="Daily Trend — latest 7 active dates in selected period" />
               <div className="mt-4 space-y-3">
                 {trendData.map((day) => (
                   <div key={day.date} className="flex items-center gap-3">

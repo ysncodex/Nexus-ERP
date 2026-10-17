@@ -37,11 +37,15 @@ async function salesByChannel(range: Range) {
 async function expenseTotals(range: Range) {
   const rows = await prisma.transaction.groupBy({
     by: ['type'],
-    where: { type: { in: ['expense_product', 'expense_fixed'] }, ...range },
+    where: { type: { in: ['expense_product', 'expense_fixed', 'expense_consumable'] }, ...range },
     _sum: { amount: true },
   });
   const get = (t: string) => Number(rows.find((r) => r.type === t)?._sum.amount ?? 0);
-  return { productCosts: get('expense_product'), fixedCosts: get('expense_fixed') };
+  return {
+    productCosts: get('expense_product'),
+    fixedCosts: get('expense_fixed'),
+    consumableCosts: get('expense_consumable'),
+  };
 }
 
 async function totalSales(range: Range) {
@@ -64,7 +68,7 @@ export async function dailyReport(req: Request, res: Response) {
     salesByMethod(range),
     expenseTotals(range),
   ]);
-  const totalExpenses = expenses.productCosts + expenses.fixedCosts;
+  const totalExpenses = expenses.productCosts + expenses.fixedCosts + expenses.consumableCosts;
 
   res.json({
     date,
@@ -86,12 +90,12 @@ export async function monthlyReport(req: Request, res: Response) {
     expenseTotals(range),
     prisma.transaction.groupBy({
       by: ['category'],
-      where: { type: { in: ['expense_product', 'expense_fixed'] }, ...range },
+      where: { type: { in: ['expense_product', 'expense_fixed', 'expense_consumable'] }, ...range },
       _sum: { amount: true },
     }),
   ]);
 
-  const totalExpenses = expenses.productCosts + expenses.fixedCosts;
+  const totalExpenses = expenses.productCosts + expenses.fixedCosts + expenses.consumableCosts;
   const profit = sales - totalExpenses;
 
   const topExpenses = byCategory
@@ -120,7 +124,7 @@ export async function profitLossReport(req: Request, res: Response) {
     expenseTotals(range),
   ]);
 
-  const totalExpenses = expenses.productCosts + expenses.fixedCosts;
+  const totalExpenses = expenses.productCosts + expenses.fixedCosts + expenses.consumableCosts;
   const grossProfit = revenue - totalExpenses;
 
   res.json({
@@ -138,6 +142,7 @@ export async function profitLossReport(req: Request, res: Response) {
       expenses: {
         productCosts: expenses.productCosts,
         fixedCosts: expenses.fixedCosts,
+        consumableCosts: expenses.consumableCosts,
         other: 0,
       },
     },
@@ -154,7 +159,7 @@ export async function customReport(req: Request, res: Response) {
     salesByChannel(range),
     expenseTotals(range),
   ]);
-  const totalExpenses = expenses.productCosts + expenses.fixedCosts;
+  const totalExpenses = expenses.productCosts + expenses.fixedCosts + expenses.consumableCosts;
 
   res.json({
     period: `${startDate} → ${endDate}`,

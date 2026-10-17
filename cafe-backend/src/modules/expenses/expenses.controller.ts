@@ -51,11 +51,12 @@ export async function expenseStats(req: Request, res: Response) {
   const q = statsQuerySchema.parse(req.query);
   const { byType, byCategory } = await expenseStatsRecords(q);
 
-  const sumForType = (t: 'expense_product' | 'expense_fixed') =>
+  const sumForType = (t: 'expense_product' | 'expense_fixed' | 'expense_consumable') =>
     Number(byType.find((r) => r.type === t)?._sum.amount ?? 0);
 
   const productCosts = sumForType('expense_product');
   const fixedCosts = sumForType('expense_fixed');
+  const consumableCosts = sumForType('expense_consumable');
 
   const expensesByCategory: Record<string, number> = {};
   for (const row of byCategory) {
@@ -63,9 +64,10 @@ export async function expenseStats(req: Request, res: Response) {
   }
 
   res.json({
-    totalExpenses: productCosts + fixedCosts,
+    totalExpenses: productCosts + fixedCosts + consumableCosts,
     productCosts,
     fixedCosts,
+    consumableCosts,
     expensesByCategory,
   });
 }
@@ -79,5 +81,11 @@ export async function productCosts(req: Request, res: Response) {
 export async function fixedCosts(req: Request, res: Response) {
   const q = statsQuerySchema.parse(req.query);
   const rows = await listExpensesByType('expense_fixed', q);
+  res.json(rows.map(serializeTransaction));
+}
+
+export async function consumableCosts(req: Request, res: Response) {
+  const q = statsQuerySchema.parse(req.query);
+  const rows = await listExpensesByType('expense_consumable', q);
   res.json(rows.map(serializeTransaction));
 }

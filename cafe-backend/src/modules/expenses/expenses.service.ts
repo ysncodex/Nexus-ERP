@@ -5,15 +5,48 @@ import { parseBusinessDate } from '../../utils/businessDate.js';
 import { normalizeCatalogName } from '../../utils/normalizeName.js';
 import { dateRangeWhere, paginate } from '../../utils/query.js';
 import {
+  ensureConsumableGroup,
+  ensureConsumableItem,
   ensureFixedCostItem,
   ensureProductCostItem,
 } from './catalog.service.js';
-import type { ExpenseCreateInput, ExpenseUpdateInput } from './expenses.schema.js';
+import {
+  type ExpenseCreateInput,
+  type ExpenseUpdateInput,
+} from './expenses.schema.js';
+import { isPayrollLinkedTransaction } from '../hr/hr.service.js';
+import { assertSufficientFunds } from '../funds/funds.service.js';
 
-const EXPENSE_TYPES = ['expense_product', 'expense_fixed'] as const;
+const EXPENSE_TYPES = ['expense_product', 'expense_fixed', 'expense_consumable'] as const;
+const NOTE_SEPARATOR = '\n[Note] ';
+const PAYROLL_LINKED_MESSAGE =
+  'This salary expense was posted by Payroll. Reverse or correct the payment from Payroll.';
 
-function itemLabel(data: ExpenseCreateInput): string {
-  return normalizeCatalogName(data.item ?? data.description ?? 'Expense');
+function itemLabel(data: { item?: string; description?: string }): string {
+  const raw = data.item?.trim() || data.description?.trim() || 'Expense';
+  const cut = raw.indexOf(NOTE_SEPARATOR);
+  return normalizeCatalogName(cut >= 0 ? raw.slice(0, cut) : raw) || 'Expense';
+}
+
+/**
+ * The catalog's canonical group label, used for both the ledger row's
+ * `category` and the cost record's `groupName`. Resolving it once keeps
+ * case/spacing variants from splitting into separate groups, which would also
+ * leave some rows behind when a group is renamed.
+ *
+ * The group catalog is a convenience list, not the source of truth, so a
+ * failure here falls back to the cleaned input instead of costing the user
+ * their recorded expense.
+ */
+async function resolveConsumableGroupName(category: string | undefined): Promise<string> {
+  const requested = category?.trim() ? category.trim() : 'Other';
+  try {
+    const group = await ensureConsumableGroup(requested);
+    return group.name.trim() || requested;
+  } catch (error: unknown) {
+    console.error('[expenses] could not register consumable group', requested, error);
+    return requested;
+  }
 }
 
 async function createFixedCostRecord(
@@ -67,6 +100,49 @@ async function createProductCostRecord(
       supplierId,
       nameSnapshot: label,
       supplierSnapshot,
+      quantity: data.quantity,
+      unit: data.unit,
+      unitPrice: data.unitPrice,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      date: businessDate,
+    },
+  });
+}
+
+async function createConsumableCostRecord(
+  transactionId: string,
+  data: ExpenseCreateInput,
+  businessDate: Date,
+  groupName: string,
+) {
+  const label = itemLabel(data);
+  const catalogItem = await ensureConsumableItem(label);
+
+  let supplierId: string | undefined;
+  let supplierSnapshot: string | undefined;
+  if (data.supplier) {
+    const normalized = normalizeCatalogName(data.supplier);
+    const supplier = await prisma.supplier.findFirst({
+      where: { name: { equals: normalized, mode: 'insensitive' } },
+    });
+    if (supplier) {
+      supplierId = supplier.id;
+      supplierSnapshot = supplier.name;
+    } else {
+      supplierSnapshot = normalized;
+    }
+  }
+
+  await prisma.consumableCostRecord.create({
+    data: {
+      transactionId,
+      consumableItemId: catalogItem.id,
+      supplierId,
+      supplierSnapshot,
+      groupName,
+      nameSnapshot: label,
+      description: data.description ?? label,
       quantity: data.quantity,
       unit: data.unit,
       unitPrice: data.unitPrice,
@@ -152,34 +228,113 @@ async function syncProductCostRecord(transactionId: string, data: ExpenseUpdateI
   });
 }
 
+async function syncConsumableCostRecord(
+  transactionId: string,
+  data: ExpenseUpdateInput,
+  canonicalGroup?: string,
+) {
+  const existing = await prisma.consumableCostRecord.findUnique({ where: { transactionId } });
+  if (!existing) return;
+
+  const label =
+    data.item !== undefined || data.description !== undefined
+      ? itemLabel({
+          item: data.item,
+          description: data.description ?? existing.nameSnapshot,
+        })
+      : undefined;
+
+  let consumableItemId = existing.consumableItemId;
+  if (label) {
+    const catalogItem = await ensureConsumableItem(label);
+    consumableItemId = catalogItem.id;
+  }
+
+  let supplierId = existing.supplierId;
+  let supplierSnapshot = existing.supplierSnapshot;
+  if (data.supplier !== undefined) {
+    if (data.supplier) {
+      const normalized = normalizeCatalogName(data.supplier);
+      const supplier = await prisma.supplier.findFirst({
+        where: { name: { equals: normalized, mode: 'insensitive' } },
+      });
+      supplierId = supplier?.id ?? null;
+      supplierSnapshot = supplier?.name ?? normalized;
+    } else {
+      supplierId = null;
+      supplierSnapshot = null;
+    }
+  }
+
+  await prisma.consumableCostRecord.update({
+    where: { transactionId },
+    data: {
+      ...(label ? { nameSnapshot: label, description: data.description ?? label } : {}),
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      ...(data.category !== undefined ? { groupName: canonicalGroup ?? data.category } : {}),
+      ...(consumableItemId !== undefined ? { consumableItemId } : {}),
+      ...(data.supplier !== undefined ? { supplierId, supplierSnapshot } : {}),
+      ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
+      ...(data.unit !== undefined ? { unit: data.unit } : {}),
+      ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
+      ...(data.amount !== undefined ? { amount: data.amount } : {}),
+      ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+      ...(data.date !== undefined ? { date: parseBusinessDate(data.date) } : {}),
+    },
+  });
+}
+
 export async function createExpenseRecord(data: ExpenseCreateInput) {
   const businessDate = parseBusinessDate(data.date);
   const label = itemLabel(data);
+  const groupName =
+    data.type === 'expense_consumable'
+      ? await resolveConsumableGroupName(data.category)
+      : undefined;
 
-  const expense = await prisma.transaction.create({
-    data: {
-      type: data.type,
-      method: data.paymentMethod,
-      category: data.category,
-      description: data.description ?? label,
-      supplier: data.supplier,
-      quantity: data.quantity,
-      unit: data.unit,
-      unitPrice: data.unitPrice,
-      amount: data.amount,
-      date: businessDate,
+  // An expense can't be paid from an account that doesn't hold the money. The
+  // check shares the ledger insert's transaction (as createFundMovement does)
+  // so the balance it read can't change before the row lands.
+  const expense = await prisma.$transaction(
+    async (tx) => {
+      await assertSufficientFunds(data.paymentMethod, data.amount, tx, {
+        what: 'this expense',
+      });
+
+      return tx.transaction.create({
+        data: {
+          type: data.type,
+          method: data.paymentMethod,
+          category: groupName ?? data.category,
+          description: data.description ?? label,
+          supplier: data.supplier,
+          quantity: data.quantity,
+          unit: data.unit,
+          unitPrice: data.unitPrice,
+          amount: data.amount,
+          date: businessDate,
+        },
+      });
     },
-  });
+    {
+      // Match the fund-movement limits — cloud database connections are slow.
+      maxWait: 10000,
+      timeout: 20000,
+    },
+  );
 
   try {
     if (data.type === 'expense_fixed') {
       await createFixedCostRecord(expense.id, data, businessDate);
+    } else if (data.type === 'expense_consumable') {
+      await createConsumableCostRecord(expense.id, data, businessDate, groupName ?? 'Other');
     } else {
       await createProductCostRecord(expense.id, data, businessDate);
     }
   } catch (err) {
     await prisma.fixedCostRecord.deleteMany({ where: { transactionId: expense.id } }).catch(() => {});
     await prisma.productCostRecord.deleteMany({ where: { transactionId: expense.id } }).catch(() => {});
+    await prisma.consumableCostRecord.deleteMany({ where: { transactionId: expense.id } }).catch(() => {});
     await prisma.transaction.delete({ where: { id: expense.id } }).catch(() => {});
     throw err;
   }
@@ -192,30 +347,64 @@ export async function updateExpenseRecord(id: string, data: ExpenseUpdateInput) 
   if (!existing || !EXPENSE_TYPES.includes(existing.type as (typeof EXPENSE_TYPES)[number])) {
     throw ApiError.notFound('Expense not found');
   }
+  if (await isPayrollLinkedTransaction(id)) throw ApiError.conflict(PAYROLL_LINKED_MESSAGE);
 
-  const updated = await prisma.transaction.update({
-    where: { id },
-    data: {
-      ...(data.type !== undefined ? { type: data.type } : {}),
-      ...(data.paymentMethod !== undefined ? { method: data.paymentMethod } : {}),
-      ...(data.category !== undefined ? { category: data.category } : {}),
-      ...(data.description !== undefined ? { description: data.description } : {}),
-      ...(data.item !== undefined && data.description === undefined
-        ? { description: data.item }
-        : {}),
-      ...(data.supplier !== undefined ? { supplier: data.supplier } : {}),
-      ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
-      ...(data.unit !== undefined ? { unit: data.unit } : {}),
-      ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
-      ...(data.amount !== undefined ? { amount: data.amount } : {}),
-      ...(data.date !== undefined ? { date: parseBusinessDate(data.date) } : {}),
+  let consumableGroup: string | undefined;
+  if (existing.type === 'expense_consumable' && data.category !== undefined) {
+    if (!data.category.trim()) {
+      throw ApiError.badRequest('Choose a consumables group.');
+    }
+    consumableGroup = await resolveConsumableGroupName(data.category);
+  }
+
+  // Re-check affordability for the resulting method/amount. The account balance
+  // already includes this row's current amount, so exclude it before comparing
+  // — otherwise an unchanged edit could reject itself. Check and write share
+  // one transaction so the balance can't move in between.
+  const nextMethod = data.paymentMethod ?? existing.method;
+  const nextAmount = data.amount ?? Number(existing.amount);
+
+  const updated = await prisma.$transaction(
+    async (tx) => {
+      if (nextMethod) {
+        await assertSufficientFunds(nextMethod, nextAmount, tx, {
+          excludeTransactionId: id,
+          what: 'this expense',
+        });
+      }
+
+      return tx.transaction.update({
+        where: { id },
+        data: {
+          ...(data.type !== undefined ? { type: data.type } : {}),
+          ...(data.paymentMethod !== undefined ? { method: data.paymentMethod } : {}),
+          ...(data.category !== undefined ? { category: consumableGroup ?? data.category } : {}),
+          ...(data.description !== undefined ? { description: data.description } : {}),
+          ...(data.item !== undefined && data.description === undefined
+            ? { description: data.item }
+            : {}),
+          ...(data.supplier !== undefined ? { supplier: data.supplier } : {}),
+          ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
+          ...(data.unit !== undefined ? { unit: data.unit } : {}),
+          ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
+          ...(data.amount !== undefined ? { amount: data.amount } : {}),
+          ...(data.date !== undefined ? { date: parseBusinessDate(data.date) } : {}),
+        },
+      });
     },
-  });
+    {
+      // Match the fund-movement limits — cloud database connections are slow.
+      maxWait: 10000,
+      timeout: 20000,
+    },
+  );
 
   if (existing.type === 'expense_fixed') {
     await syncFixedCostRecord(id, data);
   } else if (existing.type === 'expense_product') {
     await syncProductCostRecord(id, data);
+  } else if (existing.type === 'expense_consumable') {
+    await syncConsumableCostRecord(id, data, consumableGroup);
   }
 
   return updated;
@@ -226,10 +415,12 @@ export async function deleteExpenseRecord(id: string) {
   if (!existing || !EXPENSE_TYPES.includes(existing.type as (typeof EXPENSE_TYPES)[number])) {
     throw ApiError.notFound('Expense not found');
   }
+  if (await isPayrollLinkedTransaction(id)) throw ApiError.conflict(PAYROLL_LINKED_MESSAGE);
 
   try {
     await prisma.fixedCostRecord.deleteMany({ where: { transactionId: id } });
     await prisma.productCostRecord.deleteMany({ where: { transactionId: id } });
+    await prisma.consumableCostRecord.deleteMany({ where: { transactionId: id } });
     await prisma.transaction.delete({ where: { id } });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -314,7 +505,9 @@ export async function backfillExpenseRecords() {
     if (!tx.method) continue;
     const payload: ExpenseCreateInput = {
       type: tx.type as ExpenseCreateInput['type'],
-      category: tx.category ?? (tx.type === 'expense_product' ? 'Product' : 'Fixed'),
+      category:
+        tx.category ??
+        (tx.type === 'expense_product' ? 'Product' : tx.type === 'expense_consumable' ? 'Other' : 'Fixed'),
       item: tx.description,
       description: tx.description,
       supplier: tx.supplier ?? undefined,
@@ -330,6 +523,13 @@ export async function backfillExpenseRecords() {
       const exists = await prisma.fixedCostRecord.findUnique({ where: { transactionId: tx.id } });
       if (!exists) {
         await createFixedCostRecord(tx.id, payload, tx.date);
+        count++;
+      }
+    } else if (tx.type === 'expense_consumable') {
+      const exists = await prisma.consumableCostRecord.findUnique({ where: { transactionId: tx.id } });
+      if (!exists) {
+        const groupName = await resolveConsumableGroupName(payload.category);
+        await createConsumableCostRecord(tx.id, payload, tx.date, groupName);
         count++;
       }
     } else {

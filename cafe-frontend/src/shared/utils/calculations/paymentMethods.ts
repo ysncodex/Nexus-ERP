@@ -1,4 +1,4 @@
-import { isPaidSale, type Transaction } from '@/core/types/transaction.types';
+import { isLedgerExpense, isPaidSale, type Transaction } from '@/core/types/transaction.types';
 import { businessDateKey, todayBusinessKey } from '@/shared/utils/businessDate';
 import type { FundAccountType } from '@/core/types/fund.types';
 
@@ -81,7 +81,7 @@ export function calculatePaymentMethodBalances(
 
     if (isPaidSale(t)) applyBalance(method, val);
     else if (t.type === 'sale_adjustment') applyBalance(method, -val);
-    else if (t.type === 'expense_product' || t.type === 'expense_fixed') applyBalance(method, -val);
+    else if (isLedgerExpense(t.type)) applyBalance(method, -val);
   });
 
   filtered.forEach((t) => {
@@ -91,15 +91,15 @@ export function calculatePaymentMethodBalances(
     if (method === 'cash') {
       if (isPaidSale(t)) cash.sales += val;
       else if (t.type === 'sale_adjustment') cash.sales -= val;
-      else if (t.type === 'expense_product' || t.type === 'expense_fixed') cash.expenses += val;
+      else if (isLedgerExpense(t.type)) cash.expenses += val;
     } else if (method === 'bank') {
       if (isPaidSale(t)) bank.sales += val;
       else if (t.type === 'sale_adjustment') bank.sales -= val;
-      else if (t.type === 'expense_product' || t.type === 'expense_fixed') bank.expenses += val;
+      else if (isLedgerExpense(t.type)) bank.expenses += val;
     } else if (method === 'bkash') {
       if (isPaidSale(t)) bkash.sales += val;
       else if (t.type === 'sale_adjustment') bkash.sales -= val;
-      else if (t.type === 'expense_product' || t.type === 'expense_fixed') bkash.expenses += val;
+      else if (isLedgerExpense(t.type)) bkash.expenses += val;
     }
   });
 
@@ -135,7 +135,7 @@ export function calculateDailyAvailableCash(transactions: Transaction[]): number
 
     if (isPaidSale(t)) dailyAvailableCash += val;
     else if (t.type === 'sale_adjustment') dailyAvailableCash -= val;
-    else if (t.type === 'expense_product' || t.type === 'expense_fixed') dailyAvailableCash -= val;
+    else if (isLedgerExpense(t.type)) dailyAvailableCash -= val;
   });
 
   return dailyAvailableCash;

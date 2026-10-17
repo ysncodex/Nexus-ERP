@@ -32,6 +32,21 @@
   }
 }
 
+/* Sit above drawers and manage dialogs (z-50 / z-60). */
+[data-sonner-toaster] {
+  z-index: 200 !important;
+}
+
+@layer utilities {
+  /* Readability hierarchy for café ERP copy on white surfaces. */
+  .text-erp-secondary {
+    @apply text-slate-600;
+  }
+  .text-erp-muted {
+    @apply text-slate-500;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

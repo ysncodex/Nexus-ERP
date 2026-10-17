@@ -63,6 +63,8 @@ export interface ERPContextType {
   // Catalog lists (server-backed)
   fixedCostItems: CatalogItem[];
   productCostItems: CatalogItem[];
+  consumableGroups: CatalogItem[];
+  consumableItems: CatalogItem[];
   suppliers: Supplier[];
 
   /** @deprecated Use fixedCostItems / productCostItems — kept for legacy modals */
@@ -78,6 +80,14 @@ export interface ERPContextType {
   addProductCostItem: (name: string) => Promise<void>;
   renameProductCostItem: (oldName: string, newName: string) => Promise<void>;
   deleteProductCostItem: (name: string) => Promise<void>;
+
+  addConsumableGroup: (name: string) => Promise<void>;
+  renameConsumableGroup: (oldName: string, newName: string) => Promise<void>;
+  deleteConsumableGroup: (name: string) => Promise<void>;
+
+  addConsumableItem: (name: string) => Promise<void>;
+  renameConsumableItem: (oldName: string, newName: string) => Promise<void>;
+  deleteConsumableItem: (name: string) => Promise<void>;
 
   addSupplier: (data: import('@/core/api/services').SupplierCreateData) => Promise<void>;
   renameSupplier: (oldName: string, newName: string) => Promise<void>;
@@ -107,6 +117,7 @@ export interface ERPStats {
   totalExpenses: number;
   totalProductCost: number;
   totalFixedCost: number;
+  totalConsumableCost: number;
   dailyAvailableCash: number;
   netCashInRange: number;
   profit: number;
@@ -116,6 +127,7 @@ export interface ERPStats {
   recentSales: Array<{ name: string; value: number }>;
   topProducts: Array<{ name: string; cost: number; qty: number; unit: string }>;
   topFixed: Array<{ name: string; amount: number }>;
+  topConsumables: Array<{ name: string; amount: number }>;
   paymentMethods: PaymentMethodBalances;
 }
 

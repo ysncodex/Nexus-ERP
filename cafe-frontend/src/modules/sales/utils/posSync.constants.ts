@@ -96,7 +96,7 @@ export const POS_SYNC_QUICK_GUIDE = [
   {
     step: 1,
     title: 'Take orders',
-    body: 'Ring sales in New Order. When online they save to Daily Sales right away.',
+    body: 'Ring sales in New Order. When online they save right away.',
     icon: Store,
   },
   {

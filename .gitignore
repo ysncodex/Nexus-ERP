@@ -24,3 +24,11 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Local AI agent files — keep on this machine, do not commit
+AGENTS.md
+AI-AGENT-USAGE.md
+.agents/
+.cursor/
+.github/instructions/
+.github/skills/
