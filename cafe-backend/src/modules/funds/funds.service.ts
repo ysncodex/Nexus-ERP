@@ -22,6 +22,53 @@ const movementInclude = {
 
 type DbClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
+/** Accounts money can actually be spent from (mirrors the PaymentMethod enum). */
+const SPENDABLE_ACCOUNTS = ['cash', 'bank', 'bkash'] as const;
+export type SpendableAccount = (typeof SPENDABLE_ACCOUNTS)[number];
+
+export function isSpendableAccount(value: string): value is SpendableAccount {
+  return (SPENDABLE_ACCOUNTS as readonly string[]).includes(value);
+}
+
+function formatTaka(amount: number): string {
+  return `৳${amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/** Round to paisa so float noise can never block an exactly-affordable payment. */
+function toPaisaRounded(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+/**
+ * How a single ledger row moves an account's operational balance.
+ *
+ * Shared by the balances endpoint and the insufficient-funds guard so the
+ * number we validate against can never drift from the number we display.
+ */
+export function signedOperationalDelta(
+  type: string,
+  receiptStatus: string | null,
+  amount: number,
+): number {
+  if (type === 'sale') {
+    // Match frontend `isPaidSale`: NULL receiptStatus = completed (legacy quick
+    // sales). Only exclude sales explicitly pending/refunded/voided.
+    return receiptStatus === 'completed' || receiptStatus === null ? amount : 0;
+  }
+  if (
+    type === 'sale_adjustment' ||
+    type === 'expense_product' ||
+    type === 'expense_fixed' ||
+    type === 'expense_consumable'
+  ) {
+    return -amount;
+  }
+  return 0;
+}
+
 async function getAccountByType(type: FundAccountType, tx: DbClient = prisma) {
   const account = await tx.fundAccount.findUnique({ where: { type } });
   if (!account) {
@@ -121,6 +168,14 @@ export async function createFundMovement(data: FundMovementCreateInput, createdB
   return prisma.$transaction(
     async (tx) => {
       const accounts = await resolveMovementAccounts(data, tx);
+
+      // Money leaving an account must actually be there. `add`/`opening` only
+      // bring money in, so they are never blocked.
+      if (data.movementType === 'withdraw' || data.movementType === 'transfer') {
+        await assertSufficientFunds(data.fromAccount!, amount, tx, {
+          what: data.movementType === 'transfer' ? 'this transfer' : 'this withdrawal',
+        });
+      }
 
       await applyMovementBalanceChanges(data.movementType, accounts, amount, tx, 'forward');
 
@@ -233,19 +288,7 @@ export async function getCombinedAccountBalances() {
 
     if (!(method in operational)) continue;
 
-    if (group.type === 'sale') {
-      // Match frontend `isPaidSale`: NULL receiptStatus = completed (legacy quick sales).
-      // Only exclude sales explicitly marked pending/refunded/voided.
-      if (group.receiptStatus === 'completed' || group.receiptStatus === null) {
-        operational[method] += amount;
-      }
-    } else if (
-      group.type === 'sale_adjustment' ||
-      group.type === 'expense_product' ||
-      group.type === 'expense_fixed'
-    ) {
-      operational[method] -= amount;
-    }
+    operational[method] += signedOperationalDelta(group.type, group.receiptStatus, amount);
   }
 
   const fundAdjustments: Record<FundAccountType, number> = {
@@ -279,6 +322,77 @@ export async function getCombinedAccountBalances() {
     combined,
     totalLiquidity: combined.cash + combined.bank + combined.bkash,
   };
+}
+
+/**
+ * Spendable balance of one account = ledger (operational) + manual fund
+ * adjustments, i.e. exactly what the dashboard shows for that account.
+ *
+ * `excludeTransactionId` leaves one ledger row out of the sum. That is needed
+ * when re-validating an edit: the account balance already reflects the row's
+ * old amount, so it must be removed before checking the new amount.
+ */
+export async function getAvailableBalance(
+  account: FundAccountType,
+  client: DbClient = prisma,
+  opts: { excludeTransactionId?: string } = {},
+): Promise<{ available: number; label: string }> {
+  const row = await client.fundAccount.findUnique({ where: { type: account } });
+  const manual = row ? Number(row.balance) : 0;
+  const label = row?.label ?? ACCOUNT_LABELS[account];
+
+  // Only cash/bank/bkash can appear as a PaymentMethod on a ledger row, so the
+  // reserve fund has no operational component — just its adjusted balance.
+  if (!isSpendableAccount(account)) {
+    return { available: manual, label };
+  }
+
+  const groups = await client.transaction.groupBy({
+    by: ['type', 'receiptStatus'],
+    _sum: { amount: true },
+    where: {
+      method: account,
+      ...(opts.excludeTransactionId ? { id: { not: opts.excludeTransactionId } } : {}),
+    },
+  });
+
+  let operational = 0;
+  for (const group of groups) {
+    operational += signedOperationalDelta(
+      group.type,
+      group.receiptStatus,
+      Number(group._sum.amount || 0),
+    );
+  }
+
+  return { available: operational + manual, label };
+}
+
+/**
+ * Reject a payment the account cannot cover.
+ *
+ * Enforced server-side so the rule holds for every client, and kept in one
+ * place so expenses and fund withdrawals/transfers behave identically.
+ */
+export async function assertSufficientFunds(
+  account: FundAccountType,
+  amount: number,
+  client: DbClient = prisma,
+  opts: { excludeTransactionId?: string; what?: string } = {},
+): Promise<void> {
+  const needed = toPaisaRounded(amount);
+  if (!(needed > 0)) return;
+
+  const { available, label } = await getAvailableBalance(account, client, opts);
+  const spendable = toPaisaRounded(available);
+  if (needed <= spendable) return;
+
+  throw ApiError.conflict(
+    `Not enough money in ${label}. Available ${formatTaka(spendable)}, ` +
+      `but ${opts.what ?? 'this transaction'} needs ${formatTaka(needed)} ` +
+      `(short by ${formatTaka(toPaisaRounded(needed - spendable))}). ` +
+      `Add funds or choose another payment method.`,
+  );
 }
 
 /** Ensure seed accounts exist (safe to call after migration). */

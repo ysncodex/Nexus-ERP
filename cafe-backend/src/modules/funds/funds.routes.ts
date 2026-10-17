@@ -20,7 +20,8 @@ router.get('/accounts', asyncHandler(getAccounts));
 router.get('/', asyncHandler(listMovements));
 router.get('/:id', asyncHandler(getMovement));
 
-router.post('/', requireRole('owner', 'manager'), asyncHandler(createMovement));
-router.delete('/:id', requireRole('owner', 'manager'), asyncHandler(deleteMovement));
+// Managers may read balances and movement history. Only the owner may move money.
+router.post('/', requireRole('owner'), asyncHandler(createMovement));
+router.delete('/:id', requireRole('owner'), asyncHandler(deleteMovement));
 
 export default router;
